@@ -8,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
       },
     ],
-    sitemap: "https://receiptai.vercel.app/sitemap.xml",
+    sitemap: "https://receiptsai.vercel.app/sitemap.xml",
   };
 }
