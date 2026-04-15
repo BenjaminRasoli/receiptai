@@ -30,7 +30,11 @@ import TopNav from "@/components/TopNav";
 import { auth, db } from "@/firebaseConfig";
 import type { ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
-import { createEmptyRow, normalizeAIParsed, toFirestoreItem } from "@/utils/receipt";
+import {
+  createEmptyRow,
+  normalizeAIParsed,
+  toFirestoreItem,
+} from "@/utils/receipt";
 
 export default function DashboardClient() {
   const router = useRouter();
@@ -103,7 +107,9 @@ export default function DashboardClient() {
             soldDate: String(data.soldDate ?? data.sellingDate ?? ""),
             soldPrice: String(data.soldPrice ?? data.sellingPrice ?? ""),
             soldPlatform: String(data.soldPlatform ?? ""),
-            soldReceiptText: String(data.soldReceiptText ?? data.sellingReceiptText ?? ""),
+            soldReceiptText: String(
+              data.soldReceiptText ?? data.sellingReceiptText ?? "",
+            ),
             notes: String(data.notes ?? ""),
           } as ReceiptRow;
         });
@@ -112,7 +118,9 @@ export default function DashboardClient() {
         const loadError = error as FirebaseError;
         const message = loadError.message ?? "Unknown error";
         const code = loadError.code ? ` (${loadError.code})` : "";
-        setStatusMessage(`Unable to load saved receipts from Firebase${code}: ${message}`);
+        setStatusMessage(
+          `Unable to load saved receipts from Firebase${code}: ${message}`,
+        );
       } finally {
         setIsRowsLoading(false);
       }
@@ -123,9 +131,13 @@ export default function DashboardClient() {
 
   const saveRowToFirestore = async (row: ReceiptRow) => {
     if (!user) return;
-    await setDoc(doc(receiptsCollection, row.id), toFirestoreItem(row, user.uid), {
-      merge: true,
-    });
+    await setDoc(
+      doc(receiptsCollection, row.id),
+      toFirestoreItem(row, user.uid),
+      {
+        merge: true,
+      },
+    );
   };
 
   const handleSaveModal = async (row: ReceiptRow) => {
@@ -136,7 +148,9 @@ export default function DashboardClient() {
       if (formMode === "create") {
         setRows((current) => [row, ...current]);
       } else {
-        setRows((current) => current.map((item) => (item.id === row.id ? row : item)));
+        setRows((current) =>
+          current.map((item) => (item.id === row.id ? row : item)),
+        );
       }
       setFormOpen(false);
       setEditingRow(null);
@@ -213,7 +227,9 @@ export default function DashboardClient() {
       setReceiptText("");
       setParseTouched(false);
     } catch {
-      setStatusMessage("Google AI request failed. Check your API key and server logs.");
+      setStatusMessage(
+        "Google AI request failed. Check your API key and server logs.",
+      );
     } finally {
       setAiLoading(false);
     }
@@ -255,8 +271,14 @@ export default function DashboardClient() {
     return <LoadingSpinner fullPage size={48} hideLabel />;
   }
 
-  const totalSpent = rows.reduce((sum, row) => sum + (Number(row.purchasePrice) || 0), 0);
-  const totalEarned = rows.reduce((sum, row) => sum + (Number(row.soldPrice) || 0), 0);
+  const totalSpent = rows.reduce(
+    (sum, row) => sum + (Number(row.purchasePrice) || 0),
+    0,
+  );
+  const totalEarned = rows.reduce(
+    (sum, row) => sum + (Number(row.soldPrice) || 0),
+    0,
+  );
   const profit = totalEarned - totalSpent;
   const parseError = parseTouched && !receiptText.trim();
 
@@ -328,7 +350,8 @@ export default function DashboardClient() {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-semibold">Paste purchase receipt</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Paste your receipt text and let Google AI extract structured item details.
+              Paste your receipt text and let Google AI extract structured item
+              details.
             </p>
 
             <textarea
@@ -358,7 +381,7 @@ export default function DashboardClient() {
                 type="button"
                 onClick={handleParseWithAI}
                 disabled={aiLoading}
-                className="cursor-pointer inline-flex min-w-52 items-center justify-center rounded-2xl bg-slate-950 hover:bg-slate-800 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer inline-flex min-w-52 items-center justify-center rounded-2xl bg-slate-950 enabled:hover:bg-slate-800 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {aiLoading ? (
                   <LoadingSpinner label="Parsing with AI..." size={18} />
@@ -440,91 +463,101 @@ export default function DashboardClient() {
               Bought information
             </p>
             <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-slate-500">Seller</p>
-            <p className="font-medium text-slate-900">{detailsRow?.seller || "-"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Payment method</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.paymentMethod || "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Item price</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.itemPrice
-                ? formatSek(Number(detailsRow.itemPrice) || 0)
-                : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Buyer protection fee</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.buyerProtectionFee
-                ? formatSek(Number(detailsRow.buyerProtectionFee) || 0)
-                : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Shipping</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.shipping
-                ? formatSek(Number(detailsRow.shipping) || 0)
-                : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Total price</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.totalPrice
-                ? formatSek(Number(detailsRow.totalPrice) || 0)
-                : detailsRow?.purchasePrice
-                  ? formatSek(Number(detailsRow.purchasePrice) || 0)
-                  : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Platform</p>
-            <p className="font-medium text-slate-900">{detailsRow?.platform || "-"}</p>
-          </div>
+              <div>
+                <p className="text-slate-500">Seller</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.seller || "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Payment method</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.paymentMethod || "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Item price</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.itemPrice
+                    ? formatSek(Number(detailsRow.itemPrice) || 0)
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Buyer protection fee</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.buyerProtectionFee
+                    ? formatSek(Number(detailsRow.buyerProtectionFee) || 0)
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Shipping</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.shipping
+                    ? formatSek(Number(detailsRow.shipping) || 0)
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total price</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.totalPrice
+                    ? formatSek(Number(detailsRow.totalPrice) || 0)
+                    : detailsRow?.purchasePrice
+                      ? formatSek(Number(detailsRow.purchasePrice) || 0)
+                      : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Platform</p>
+                <p className="font-medium text-slate-900">
+                  {detailsRow?.platform || "-"}
+                </p>
+              </div>
             </div>
           </div>
 
           {detailsRow?.sold ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Sold information
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-slate-500">Sold platform</p>
-            <p className="font-medium text-slate-900">{detailsRow?.soldPlatform || "-"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Sold price</p>
-            <p className="font-medium text-slate-900">
-              {detailsRow?.soldPrice ? formatSek(Number(detailsRow.soldPrice) || 0) : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-slate-500">Sold date</p>
-            <p className="font-medium text-slate-900">{detailsRow?.soldDate || "-"}</p>
-          </div>
-          <div>
-            <p className="text-slate-500">Status</p>
-            <span
-              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                detailsRow?.sold
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-emerald-100 text-emerald-700"
-              }`}
-            >
-              {detailsRow?.sold ? "sold" : "available"}
-            </span>
-          </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Sold information
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-slate-500">Sold platform</p>
+                  <p className="font-medium text-slate-900">
+                    {detailsRow?.soldPlatform || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Sold price</p>
+                  <p className="font-medium text-slate-900">
+                    {detailsRow?.soldPrice
+                      ? formatSek(Number(detailsRow.soldPrice) || 0)
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Sold date</p>
+                  <p className="font-medium text-slate-900">
+                    {detailsRow?.soldDate || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Status</p>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                      detailsRow?.sold
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {detailsRow?.sold ? "sold" : "available"}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
           ) : null}
         </div>
       </Modal>
