@@ -358,7 +358,7 @@ export default function DashboardClient() {
                 type="button"
                 onClick={handleParseWithAI}
                 disabled={aiLoading}
-                className="cursor-pointer inline-flex min-w-52 items-center justify-center rounded-2xl bg-blue-950 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer inline-flex min-w-52 items-center justify-center rounded-2xl bg-slate-950 hover:bg-slate-800 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {aiLoading ? (
                   <LoadingSpinner label="Parsing with AI..." size={18} />
