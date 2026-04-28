@@ -41,14 +41,30 @@ export default function DashboardClient() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [rows, setRows] = useState<ReceiptRow[]>([]);
-  const [statusMessage, setStatusMessage] = useState("");
+
+  const [purchaseStatusMessage, setPurchaseStatusMessage] = useState("");
   const [aiSuccessMessage, setAiSuccessMessage] = useState("");
   const [receiptText, setReceiptText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [parseTouched, setParseTouched] = useState(false);
+
+  const [soldStatusMessage, setSoldStatusMessage] = useState("");
+  const [soldAiSuccessMessage, setSoldAiSuccessMessage] = useState("");
+  const [soldReceiptText, setSoldReceiptText] = useState("");
+  const [soldAiLoading, setSoldAiLoading] = useState(false);
+  const [soldParseTouched, setSoldParseTouched] = useState(false);
+  const [soldConfirmOpen, setSoldConfirmOpen] = useState(false);
+  const [pendingSoldItems, setPendingSoldItems] = useState<ReceiptRow[]>([]);
+
+  const [matchExistingOpen, setMatchExistingOpen] = useState(false);
+  const [parsedSoldData, setParsedSoldData] = useState<ReceiptRow | null>(null);
+  const [selectedExistingId, setSelectedExistingId] = useState<string>("");
+  const [matchLinkError, setMatchLinkError] = useState("");
+  const [matchSoldPriceError, setMatchSoldPriceError] = useState("");
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
-  const [parseTouched, setParseTouched] = useState(false);
   const [isRowsLoading, setIsRowsLoading] = useState(true);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -62,6 +78,8 @@ export default function DashboardClient() {
   const [signOutOpen, setSignOutOpen] = useState(false);
 
   const receiptsCollection = useMemo(() => collection(db, "items"), []);
+
+  const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -118,7 +136,7 @@ export default function DashboardClient() {
         const loadError = error as FirebaseError;
         const message = loadError.message ?? "Unknown error";
         const code = loadError.code ? ` (${loadError.code})` : "";
-        setStatusMessage(
+        setPurchaseStatusMessage(
           `Unable to load saved receipts from Firebase${code}: ${message}`,
         );
       } finally {
@@ -141,7 +159,7 @@ export default function DashboardClient() {
   };
 
   const handleSaveModal = async (row: ReceiptRow) => {
-    setStatusMessage("");
+    setPurchaseStatusMessage("");
     setIsSavingItem(true);
     try {
       await saveRowToFirestore(row);
@@ -158,7 +176,7 @@ export default function DashboardClient() {
       const saveError = error as FirebaseError;
       const message = saveError.message ?? "Unknown error";
       const code = saveError.code ? ` (${saveError.code})` : "";
-      setStatusMessage(`Unable to save to Firebase${code}: ${message}`);
+      setPurchaseStatusMessage(`Unable to save to Firebase${code}: ${message}`);
     } finally {
       setIsSavingItem(false);
     }
@@ -176,7 +194,9 @@ export default function DashboardClient() {
       const deleteError = error as FirebaseError;
       const message = deleteError.message ?? "Unknown error";
       const code = deleteError.code ? ` (${deleteError.code})` : "";
-      setStatusMessage(`Unable to delete from Firebase${code}: ${message}`);
+      setPurchaseStatusMessage(
+        `Unable to delete from Firebase${code}: ${message}`,
+      );
     } finally {
       setIsDeletingItem(false);
     }
@@ -185,12 +205,12 @@ export default function DashboardClient() {
   const handleParseWithAI = async () => {
     setParseTouched(true);
     setAiSuccessMessage("");
+    setPurchaseStatusMessage("");
     if (!receiptText.trim()) {
       return;
     }
 
     setAiLoading(true);
-    setStatusMessage("");
 
     try {
       const response = await fetch("/api/receipt", {
@@ -201,7 +221,7 @@ export default function DashboardClient() {
       const result = await response.json();
 
       if (!response.ok) {
-        setStatusMessage(result.error ?? "Google AI parse failed.");
+        setPurchaseStatusMessage(result.error ?? "Google AI parse failed.");
         return;
       }
 
@@ -213,7 +233,7 @@ export default function DashboardClient() {
         : [];
 
       if (!parsed.length) {
-        setStatusMessage(
+        setPurchaseStatusMessage(
           "Google AI returned no structured items. Try a clearer receipt.",
         );
         return;
@@ -227,12 +247,158 @@ export default function DashboardClient() {
       setReceiptText("");
       setParseTouched(false);
     } catch {
-      setStatusMessage(
+      setPurchaseStatusMessage(
         "Google AI request failed. Check your API key and server logs.",
       );
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const handleParseSoldWithAI = async () => {
+    setSoldParseTouched(true);
+    setSoldAiSuccessMessage("");
+    setSoldStatusMessage("");
+    if (!soldReceiptText.trim()) {
+      return;
+    }
+
+    setSoldAiLoading(true);
+
+    try {
+      const response = await fetch("/api/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: soldReceiptText }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setSoldStatusMessage(result.error ?? "Google AI parse failed.");
+        return;
+      }
+
+      const aiResult = result.parsed;
+      const firstParsed = aiResult
+        ? Array.isArray(aiResult)
+          ? normalizeAIParsed((aiResult as unknown[])[0])
+          : normalizeAIParsed(aiResult)
+        : null;
+
+      if (!firstParsed) {
+        setSoldStatusMessage(
+          "Google AI returned no structured items. Try a clearer receipt.",
+        );
+        return;
+      }
+
+      const soldParsed: ReceiptRow = {
+        ...firstParsed,
+        sold: true,
+        soldDate:
+          firstParsed.soldDate || new Date().toISOString().split("T")[0],
+        soldPrice: firstParsed.soldPrice || firstParsed.purchasePrice || "",
+        soldPlatform: firstParsed.soldPlatform || firstParsed.platform || "",
+      };
+      setParsedSoldData(soldParsed);
+      setSelectedExistingId(inventoryItems[0]?.id ?? "");
+      setMatchLinkError("");
+      setMatchSoldPriceError("");
+      setMatchExistingOpen(true);
+      setSoldReceiptText("");
+      setSoldParseTouched(false);
+    } catch {
+      setSoldStatusMessage(
+        "Google AI request failed. Check your API key and server logs.",
+      );
+    } finally {
+      setSoldAiLoading(false);
+    }
+  };
+
+  const handleMatchExistingConfirm = async () => {
+    if (!parsedSoldData) return;
+    let hasError = false;
+
+    if (!selectedExistingId) {
+      setMatchLinkError(
+        "Please select an inventory item to link this sale to.",
+      );
+      hasError = true;
+    }
+
+    const soldPriceNum = Number(parsedSoldData.soldPrice);
+    if (
+      !parsedSoldData.soldPrice.trim() ||
+      Number.isNaN(soldPriceNum) ||
+      soldPriceNum <= 0
+    ) {
+      setMatchSoldPriceError("Sold price must be greater than 0.");
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    setIsSavingItem(true);
+    setMatchLinkError("");
+    setMatchSoldPriceError("");
+
+    try {
+      const existingRow = rows.find((r) => r.id === selectedExistingId);
+      if (!existingRow) throw new Error("Item not found");
+      const updatedRow: ReceiptRow = {
+        ...existingRow,
+        sold: true,
+        soldDate: parsedSoldData.soldDate,
+        soldPrice: parsedSoldData.soldPrice,
+        soldPlatform: parsedSoldData.soldPlatform,
+        soldReceiptText: parsedSoldData.soldReceiptText,
+      };
+      await saveRowToFirestore(updatedRow);
+      setRows((current) =>
+        current.map((r) => (r.id === selectedExistingId ? updatedRow : r)),
+      );
+      setSoldAiSuccessMessage(
+        `"${existingRow.item}" marked as sold for ${formatSek(Number(parsedSoldData.soldPrice) || 0)}.`,
+      );
+
+      setMatchExistingOpen(false);
+      setParsedSoldData(null);
+    } catch (error: unknown) {
+      const saveError = error as FirebaseError;
+      const message = saveError.message ?? "Unknown error";
+      const code = saveError.code ? ` (${saveError.code})` : "";
+      setSoldStatusMessage(`Unable to save to Firebase${code}: ${message}`);
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleSoldConfirm = async (confirmedItems: ReceiptRow[]) => {
+    if (!user) return;
+
+    setIsSavingItem(true);
+    try {
+      await Promise.all(confirmedItems.map((row) => saveRowToFirestore(row)));
+      setRows((current) => [...confirmedItems, ...current]);
+      setSoldAiSuccessMessage(
+        `Marked ${confirmedItems.length} item(s) as sold.`,
+      );
+      setSoldConfirmOpen(false);
+      setPendingSoldItems([]);
+    } catch (error: unknown) {
+      const saveError = error as FirebaseError;
+      const message = saveError.message ?? "Unknown error";
+      const code = saveError.code ? ` (${saveError.code})` : "";
+      setSoldStatusMessage(`Unable to save to Firebase${code}: ${message}`);
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleSoldConfirmCancel = () => {
+    setSoldConfirmOpen(false);
+    setPendingSoldItems([]);
   };
 
   const openCreateModal = () => {
@@ -347,55 +513,117 @@ export default function DashboardClient() {
         </div>
 
         <section className="mt-10 space-y-8">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold">Paste purchase receipt</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Paste your receipt text and let Google AI extract structured item
-              details.
-            </p>
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold">Paste purchase receipt</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Paste your receipt text and let Google AI extract structured
+                item details.
+              </p>
 
-            <textarea
-              value={receiptText}
-              onChange={(event) => {
-                setReceiptText(event.target.value);
-                setAiSuccessMessage("");
-                if (event.target.value.trim()) {
-                  setParseTouched(false);
-                }
-              }}
-              rows={10}
-              className="mt-4 max-h-80 w-full resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900"
-              placeholder="Copy in receipt text here..."
-              disabled={aiLoading}
-            />
-            <div className="mt-2 min-h-5">
-              {parseError ? (
-                <p className="text-sm font-medium text-rose-600">
-                  Copy in receipt text before parsing.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={handleParseWithAI}
+              <textarea
+                value={receiptText}
+                onChange={(event) => {
+                  setReceiptText(event.target.value);
+                  setAiSuccessMessage("");
+                  if (event.target.value.trim()) {
+                    setParseTouched(false);
+                  }
+                }}
+                rows={10}
+                className="mt-4 max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900"
+                placeholder="Copy in receipt text here..."
                 disabled={aiLoading}
-                className="cursor-pointer inline-flex min-w-52 items-center justify-center rounded-2xl bg-slate-950 enabled:hover:bg-slate-800 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {aiLoading ? (
-                  <LoadingSpinner label="Parsing with AI..." size={18} />
-                ) : (
-                  "Parse with Google AI"
-                )}
-              </button>
+              />
+              <div className="mt-2 h-5">
+                {parseError ? (
+                  <p className="text-sm font-medium text-rose-600">
+                    Copy in receipt text before parsing.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={handleParseWithAI}
+                  disabled={aiLoading}
+                  className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+                >
+                  {aiLoading ? (
+                    <LoadingSpinner label="Parsing with AI..." size={18} />
+                  ) : (
+                    "Parse with Google AI"
+                  )}
+                </button>
+              </div>
+              <div className="mt-3 h-10">
+                {purchaseStatusMessage && !parseError ? (
+                  <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800">
+                    {purchaseStatusMessage}
+                  </p>
+                ) : aiSuccessMessage ? (
+                  <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
+                    {aiSuccessMessage}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <div className="mt-2 min-h-10">
-              {aiSuccessMessage ? (
-                <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
-                  {aiSuccessMessage}
-                </p>
-              ) : null}
+
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-semibold">Mark item as sold</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Paste your sold item receipt and let Google AI extract the sale
+                details.
+              </p>
+
+              <textarea
+                value={soldReceiptText}
+                onChange={(event) => {
+                  setSoldReceiptText(event.target.value);
+                  setSoldAiSuccessMessage("");
+                  if (event.target.value.trim()) {
+                    setSoldParseTouched(false);
+                  }
+                }}
+                rows={10}
+                className="mt-4 max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900"
+                placeholder="Copy in sold receipt text here..."
+                disabled={soldAiLoading}
+              />
+              <div className="mt-2 h-5">
+                {soldParseTouched && !soldReceiptText.trim() ? (
+                  <p className="text-sm font-medium text-rose-600">
+                    Copy in receipt text before parsing.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={handleParseSoldWithAI}
+                  disabled={soldAiLoading}
+                  className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+                >
+                  {soldAiLoading ? (
+                    <LoadingSpinner label="Parsing with AI..." size={18} />
+                  ) : (
+                    "Parse with Google AI"
+                  )}
+                </button>
+              </div>
+              <div className="mt-3 h-10">
+                {soldStatusMessage ? (
+                  <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800">
+                    {soldStatusMessage}
+                  </p>
+                ) : soldAiSuccessMessage ? (
+                  <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
+                    {soldAiSuccessMessage}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -413,12 +641,6 @@ export default function DashboardClient() {
             />
           )}
         </section>
-
-        {statusMessage ? (
-          <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {statusMessage}
-          </p>
-        ) : null}
       </div>
 
       <ReceiptFormModal
@@ -451,6 +673,267 @@ export default function DashboardClient() {
         onCancel={() => setSignOutOpen(false)}
         onConfirm={() => void handleLogout()}
       />
+
+      <Modal
+        isOpen={matchExistingOpen}
+        title="Link to existing item"
+        onClose={() => {
+          setMatchExistingOpen(false);
+          setParsedSoldData(null);
+          setMatchLinkError("");
+          setMatchSoldPriceError("");
+        }}
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-slate-600">
+            Select an existing inventory item to mark as sold and merge the sale
+            details into it.
+          </p>
+
+          {parsedSoldData && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Parsed sale details
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Sold Price (SEK) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={parsedSoldData.soldPrice}
+                    onChange={(e) => {
+                      setParsedSoldData((prev) =>
+                        prev ? { ...prev, soldPrice: e.target.value } : prev,
+                      );
+                      if (e.target.value.trim() && Number(e.target.value) > 0) {
+                        setMatchSoldPriceError("");
+                      }
+                    }}
+                    className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 ${
+                      matchSoldPriceError
+                        ? "border-rose-400"
+                        : "border-slate-300"
+                    }`}
+                    placeholder="0"
+                  />
+                  {matchSoldPriceError && (
+                    <p className="mt-1 text-xs font-medium text-rose-600">
+                      {matchSoldPriceError}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Sold Date
+                  </label>
+                  <input
+                    type="date"
+                    value={parsedSoldData.soldDate}
+                    onChange={(e) =>
+                      setParsedSoldData((prev) =>
+                        prev ? { ...prev, soldDate: e.target.value } : prev,
+                      )
+                    }
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Platform (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={parsedSoldData.soldPlatform}
+                    onChange={(e) =>
+                      setParsedSoldData((prev) =>
+                        prev ? { ...prev, soldPlatform: e.target.value } : prev,
+                      )
+                    }
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                    placeholder="Tradera, Vinted, eBay, etc."
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Inventory item <span className="text-rose-500">*</span>
+            </label>
+            {inventoryItems.length > 0 ? (
+              <select
+                value={selectedExistingId}
+                onChange={(e) => {
+                  setSelectedExistingId(e.target.value);
+                  if (e.target.value) setMatchLinkError("");
+                }}
+                className="w-full cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-900"
+              >
+                <option value="" disabled>
+                  — Select an item —
+                </option>
+                {inventoryItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.item || item.itemName || "Unnamed item"}
+                    {item.purchaseDate ? ` · ${item.purchaseDate}` : ""}
+                    {item.purchasePrice
+                      ? ` · ${formatSek(Number(item.purchasePrice) || 0)}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                No unsold inventory items found. Add a purchase receipt first
+                before linking a sale.
+              </div>
+            )}
+            {matchLinkError && (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {matchLinkError}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMatchExistingOpen(false);
+                setParsedSoldData(null);
+                setMatchLinkError("");
+                setMatchSoldPriceError("");
+              }}
+              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleMatchExistingConfirm()}
+              disabled={isSavingItem || inventoryItems.length === 0}
+              className="flex-1 cursor-pointer rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+            >
+              {isSavingItem ? "Saving..." : "Mark as sold"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={soldConfirmOpen}
+        title="Confirm sold item"
+        onClose={handleSoldConfirmCancel}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Review and edit the sold item details before confirming.
+          </p>
+          <div className="max-h-96 space-y-4 overflow-y-auto">
+            {pendingSoldItems.map((item, index) => (
+              <div
+                key={index}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <input
+                    type="text"
+                    value={item.item}
+                    onChange={(e) => {
+                      const newItems = [...pendingSoldItems];
+                      newItems[index] = {
+                        ...newItems[index],
+                        item: e.target.value,
+                      };
+                      setPendingSoldItems(newItems);
+                    }}
+                    className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-slate-900"
+                    placeholder="Item name"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Sold Price (SEK)
+                    </label>
+                    <input
+                      type="number"
+                      value={item.soldPrice}
+                      onChange={(e) => {
+                        const newItems = [...pendingSoldItems];
+                        newItems[index] = {
+                          ...newItems[index],
+                          soldPrice: e.target.value,
+                        };
+                        setPendingSoldItems(newItems);
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Sold Date
+                    </label>
+                    <input
+                      type="date"
+                      value={item.soldDate}
+                      onChange={(e) => {
+                        const newItems = [...pendingSoldItems];
+                        newItems[index] = {
+                          ...newItems[index],
+                          soldDate: e.target.value,
+                        };
+                        setPendingSoldItems(newItems);
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Platform (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={item.soldPlatform}
+                      onChange={(e) => {
+                        const newItems = [...pendingSoldItems];
+                        newItems[index] = {
+                          ...newItems[index],
+                          soldPlatform: e.target.value,
+                        };
+                        setPendingSoldItems(newItems);
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                      placeholder="Tradera, Vinted, eBay, etc."
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSoldConfirmCancel}
+              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSoldConfirm(pendingSoldItems)}
+              disabled={isSavingItem}
+              className="flex-1 cursor-pointer rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-emerald-600"
+            >
+              {isSavingItem ? "Saving..." : "Confirm Sale"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={detailsOpen}
