@@ -35,6 +35,7 @@ import {
   normalizeAIParsed,
   toFirestoreItem,
 } from "@/utils/receipt";
+import InventoryChat from "./InventoryChat";
 
 export default function DashboardClient() {
   const router = useRouter();
@@ -513,6 +514,7 @@ export default function DashboardClient() {
         </div>
 
         <section className="mt-10 space-y-8">
+          <InventoryChat rows={rows} />
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
             <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-2xl font-semibold">Paste purchase receipt</h2>
@@ -571,7 +573,7 @@ export default function DashboardClient() {
             </div>
 
             <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold">Mark item as sold</h2>
+              <h2 className="text-2xl font-semibold">Paste sold receipt</h2>
               <p className="mt-2 text-sm text-slate-600">
                 Paste your sold item receipt and let Google AI extract the sale
                 details.
