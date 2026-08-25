@@ -1,34 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
 import type { ReceiptRow } from "@/types/receipt";
 import { createEmptyRow } from "@/utils/receipt";
+import EditableSelect from "./Editableselect";
 
 type Props = {
   isOpen: boolean;
   mode: "create" | "edit";
   initialRow?: ReceiptRow | null;
   isSaving?: boolean;
+  platformOptions: string[];
+  paymentMethodOptions: string[];
   onClose: () => void;
   onSave: (row: ReceiptRow) => Promise<void> | void;
 };
+
+const getToday = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const selectClassName =
+  "w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900";
+const inputClassName =
+  "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900";
 
 export default function ReceiptFormModal({
   isOpen,
   mode,
   initialRow,
   isSaving = false,
+  platformOptions,
+  paymentMethodOptions,
   onClose,
   onSave,
 }: Props) {
-  const [draft, setDraft] = useState<ReceiptRow>(
-    initialRow ?? createEmptyRow(),
-  );
+  const [draft, setDraft] = useState<ReceiptRow>(() => ({
+    ...createEmptyRow(),
+    purchaseDate: getToday(),
+  }));
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (mode === "edit" && initialRow) {
+      setDraft(initialRow);
+      return;
+    }
+
+    setDraft({
+      ...createEmptyRow(),
+      purchaseDate: getToday(),
+    });
+
+    setErrors({});
+  }, [isOpen, mode, initialRow]);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const updateField = (key: keyof ReceiptRow, value: string | boolean) => {
-    // When unchecking "sold", clear all sold-related fields
     if (key === "sold" && value === false) {
       setDraft((current) => ({
         ...current,
@@ -37,6 +73,7 @@ export default function ReceiptFormModal({
         soldPrice: "",
         soldPlatform: "",
       }));
+
       setErrors((current) => {
         const next = { ...current };
         delete next.soldDate;
@@ -44,8 +81,21 @@ export default function ReceiptFormModal({
         delete next.soldPlatform;
         return next;
       });
+
       return;
     }
+
+    if (key === "sold" && value === true) {
+      setDraft((current) => ({
+        ...current,
+        sold: true,
+        soldDate: current.soldDate || getToday(),
+      }));
+
+      setErrors((current) => ({ ...current, sold: "" }));
+      return;
+    }
+
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
   };
@@ -150,12 +200,12 @@ export default function ReceiptFormModal({
 
           <label className="space-y-1 text-sm text-slate-700">
             Payment method
-            <input
+            <EditableSelect
               value={draft.paymentMethod}
-              onChange={(event) =>
-                updateField("paymentMethod", event.target.value)
-              }
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              options={paymentMethodOptions}
+              onChange={(value) => updateField("paymentMethod", value)}
+              selectClassName={selectClassName}
+              inputClassName={inputClassName}
             />
             <p className="min-h-4 text-xs font-medium text-rose-600">
               {errors.paymentMethod ?? ""}
@@ -164,10 +214,12 @@ export default function ReceiptFormModal({
 
           <label className="space-y-1 text-sm text-slate-700">
             Platform
-            <input
+            <EditableSelect
               value={draft.platform}
-              onChange={(event) => updateField("platform", event.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              options={platformOptions}
+              onChange={(value) => updateField("platform", value)}
+              selectClassName={selectClassName}
+              inputClassName={inputClassName}
             />
             <p className="min-h-4 text-xs font-medium text-rose-600">
               {errors.platform ?? ""}
@@ -301,12 +353,12 @@ export default function ReceiptFormModal({
 
             <label className="space-y-1 text-sm text-slate-700 sm:col-span-2">
               Sold platform
-              <input
+              <EditableSelect
                 value={draft.soldPlatform}
-                onChange={(event) =>
-                  updateField("soldPlatform", event.target.value)
-                }
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+                options={platformOptions}
+                onChange={(value) => updateField("soldPlatform", value)}
+                selectClassName={selectClassName}
+                inputClassName={inputClassName}
               />
               <p className="min-h-4 text-xs font-medium text-rose-600">
                 {errors.soldPlatform ?? ""}

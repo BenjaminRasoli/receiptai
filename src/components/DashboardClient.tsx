@@ -82,6 +82,26 @@ export default function DashboardClient() {
 
   const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
+  const platformOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const platform = row.platform.trim();
+      const soldPlatform = row.soldPlatform.trim();
+      if (platform) values.add(platform);
+      if (soldPlatform) values.add(soldPlatform);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const paymentMethodOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const paymentMethod = row.paymentMethod.trim();
+      if (paymentMethod) values.add(paymentMethod);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -651,6 +671,8 @@ export default function DashboardClient() {
         mode={formMode}
         initialRow={editingRow}
         isSaving={isSavingItem}
+        platformOptions={platformOptions}
+        paymentMethodOptions={paymentMethodOptions}
         onClose={() => setFormOpen(false)}
         onSave={handleSaveModal}
       />
