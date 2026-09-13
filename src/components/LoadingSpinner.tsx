@@ -16,9 +16,9 @@ export default function LoadingSpinner({
   hideLabel = false,
 }: Props) {
   const content = (
-    <div className="flex items-center gap-3 text-slate-700">
+    <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
       <LoaderCircle
-        className="animate-spin text-slate-900"
+        className="animate-spin text-slate-900 dark:text-slate-100"
         style={{ width: size, height: size }}
       />
       {!hideLabel ? <span className="text-sm">{label}</span> : null}
@@ -27,7 +27,7 @@ export default function LoadingSpinner({
 
   if (fullPage) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         {content}
       </main>
     );

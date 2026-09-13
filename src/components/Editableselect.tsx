@@ -46,7 +46,7 @@ export default function EditableSelect({
             onClick={() => setIsAdding(false)}
             className={
               linkClassName ??
-              "cursor-pointer whitespace-nowrap text-xs font-medium text-slate-500 hover:text-slate-900"
+              "cursor-pointer whitespace-nowrap text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
             }
           >
             Choose existing

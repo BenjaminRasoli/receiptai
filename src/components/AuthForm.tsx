@@ -100,13 +100,15 @@ export default function AuthForm() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
       <div className="mx-auto max-w-lg px-6 py-16">
-        <section className="rounded-3xl border border-slate-200 bg-white p-10 shadow-lg shadow-slate-200/50">
+        <section className="rounded-3xl border border-slate-200 bg-white p-10 shadow-lg shadow-slate-200/50 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-semibold text-slate-950">ReceiptAI</h1>
+            <h1 className="text-3xl font-semibold text-slate-950 dark:text-slate-50">
+              ReceiptAI
+            </h1>
           </div>
-          <p className="mt-3 text-slate-600">
+          <p className="mt-3 text-slate-600 dark:text-slate-400">
             Log in or create an account to manage your receipts.
           </p>
 
@@ -115,7 +117,11 @@ export default function AuthForm() {
               <button
                 type="button"
                 onClick={() => setMode("login")}
-                className={`cursor-pointer rounded-2xl px-4 py-2 transition ${mode === "login" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`cursor-pointer rounded-2xl px-4 py-2 transition ${
+                  mode === "login"
+                    ? "bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-900"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                }`}
               >
                 <span className="inline-flex items-center gap-2">
                   <LogIn className="h-4 w-4" />
@@ -125,7 +131,11 @@ export default function AuthForm() {
               <button
                 type="button"
                 onClick={() => setMode("register")}
-                className={`cursor-pointer rounded-2xl px-4 py-2 transition ${mode === "register" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"}`}
+                className={`cursor-pointer rounded-2xl px-4 py-2 transition ${
+                  mode === "register"
+                    ? "bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-900"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                }`}
               >
                 <span className="inline-flex items-center gap-2">
                   <UserPlus className="h-4 w-4" />
@@ -134,33 +144,33 @@ export default function AuthForm() {
               </button>
             </div>
 
-            <label className="mx-auto block w-full max-w-sm space-y-1 text-sm text-slate-700">
+            <label className="mx-auto block w-full max-w-sm space-y-1 text-sm text-slate-700 dark:text-slate-300">
               Email
               <input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 type="email"
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400"
               />
-              <p className="min-h-4 text-xs font-medium text-rose-600">
+              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {fieldErrors.email ?? ""}
               </p>
             </label>
-            <label className="mx-auto block w-full max-w-sm space-y-1 text-sm text-slate-700">
+            <label className="mx-auto block w-full max-w-sm space-y-1 text-sm text-slate-700 dark:text-slate-300">
               Password
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400"
               />
-              <p className="min-h-4 text-xs font-medium text-rose-600">
+              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {fieldErrors.password ?? ""}
               </p>
             </label>
 
             <div className="mx-auto w-full max-w-sm min-h-5">
-              <p className="text-xs font-medium text-rose-600">
+              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">
                 {statusMessage}
               </p>
             </div>
@@ -168,8 +178,8 @@ export default function AuthForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`mx-auto cursor-pointer inline-flex w-full max-w-sm items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                isSubmitting ? "" : "hover:bg-slate-800"
+              className={`mx-auto cursor-pointer inline-flex w-full max-w-sm items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 ${
+                isSubmitting ? "" : "hover:bg-slate-800 dark:hover:bg-slate-300"
               }`}
             >
               {isSubmitting ? (
@@ -182,19 +192,21 @@ export default function AuthForm() {
             </button>
 
             <div className="mx-auto flex w-full max-w-sm items-center gap-3 pt-1">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs uppercase tracking-wide text-slate-400">
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              <span className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 or
               </span>
-              <div className="h-px flex-1 bg-slate-200" />
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             </div>
 
             <button
               type="button"
               onClick={() => void handleGoogleSignIn()}
               disabled={isGoogleSubmitting}
-              className={`mx-auto cursor-pointer inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                isGoogleSubmitting ? "" : "hover:bg-slate-50"
+              className={`mx-auto cursor-pointer inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 ${
+                isGoogleSubmitting
+                  ? ""
+                  : "hover:bg-slate-50 dark:hover:bg-slate-700"
               }`}
             >
               {isGoogleSubmitting ? (

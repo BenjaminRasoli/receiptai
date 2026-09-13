@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type WheelEvent } from "react";
 import Modal from "@/components/Modal";
-import type { ReceiptRow } from "@/types/receipt";
-import { createEmptyRow } from "@/utils/receipt";
+import type { ItemStatus, ReceiptRow } from "@/types/receipt";
+import { applyStatus, createEmptyRow, STATUS_OPTIONS } from "@/utils/receipt";
 import EditableSelect from "./Editableselect";
 
 type Props = {
@@ -27,9 +27,13 @@ const getToday = () => {
 };
 
 const selectClassName =
-  "w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900";
+  "w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
 const inputClassName =
-  "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900";
+  "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
+
+const blockWheelChange = (e: WheelEvent<HTMLInputElement>) => {
+  e.currentTarget.blur();
+};
 
 export default function ReceiptFormModal({
   isOpen,
@@ -65,39 +69,19 @@ export default function ReceiptFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const updateField = (key: keyof ReceiptRow, value: string | boolean) => {
-    if (key === "sold" && value === false) {
-      setDraft((current) => ({
-        ...current,
-        sold: false,
-        soldDate: "",
-        soldPrice: "",
-        soldPlatform: "",
-      }));
-
-      setErrors((current) => {
-        const next = { ...current };
-        delete next.soldDate;
-        delete next.soldPrice;
-        delete next.soldPlatform;
-        return next;
-      });
-
-      return;
-    }
-
-    if (key === "sold" && value === true) {
-      setDraft((current) => ({
-        ...current,
-        sold: true,
-        soldDate: current.soldDate || getToday(),
-      }));
-
-      setErrors((current) => ({ ...current, sold: "" }));
-      return;
-    }
-
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
+  };
+
+  const updateStatus = (status: ItemStatus) => {
+    setDraft((current) => applyStatus(current, status));
+    setErrors((current) => ({
+      ...current,
+      status: "",
+      soldDate: "",
+      soldPrice: "",
+      soldPlatform: "",
+    }));
   };
 
   const validate = () => {
@@ -116,7 +100,7 @@ export default function ReceiptFormModal({
       nextErrors.purchasePrice = "Purchase price must be greater than 0.";
     }
 
-    if (draft.sold) {
+    if (draft.status === "sold") {
       const soldPrice = Number(draft.soldPrice);
       if (
         !draft.soldPrice.trim() ||
@@ -142,8 +126,8 @@ export default function ReceiptFormModal({
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className={`cursor-pointer rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 ${
-              isSaving ? "" : "hover:bg-slate-200"
+            className={`cursor-pointer rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
+              isSaving ? "" : "hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
             Cancel
@@ -152,8 +136,8 @@ export default function ReceiptFormModal({
             type="submit"
             form="receipt-form"
             disabled={isSaving}
-            className={`cursor-pointer rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
-              isSaving ? "" : "hover:bg-slate-800"
+            className={`cursor-pointer rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
+              isSaving ? "" : "hover:bg-slate-800 dark:hover:bg-slate-700"
             }`}
           >
             {isSaving
@@ -174,31 +158,31 @@ export default function ReceiptFormModal({
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Item <span className="text-rose-500">*</span>
             <input
               value={draft.item}
               onChange={(event) => updateField("item", event.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.item ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Seller
             <input
               value={draft.seller}
               onChange={(event) => updateField("seller", event.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.seller ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Payment method
             <EditableSelect
               value={draft.paymentMethod}
@@ -207,12 +191,12 @@ export default function ReceiptFormModal({
               selectClassName={selectClassName}
               inputClassName={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.paymentMethod ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Platform
             <EditableSelect
               value={draft.platform}
@@ -221,12 +205,12 @@ export default function ReceiptFormModal({
               selectClassName={selectClassName}
               inputClassName={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.platform ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Purchase date
             <input
               type="date"
@@ -234,91 +218,105 @@ export default function ReceiptFormModal({
               onChange={(event) =>
                 updateField("purchaseDate", event.target.value)
               }
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Purchase price (kr) <span className="text-rose-500">*</span>
             <input
               type="number"
               min="0.01"
               step="0.01"
+              inputMode="decimal"
+              onWheel={blockWheelChange}
               value={draft.purchasePrice}
               onChange={(event) =>
                 updateField("purchasePrice", event.target.value)
               }
               placeholder="0.00"
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.purchasePrice ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Item price (kr)
             <input
               type="number"
               min="0"
               step="0.01"
+              inputMode="decimal"
+              onWheel={blockWheelChange}
               value={draft.itemPrice}
               onChange={(event) => updateField("itemPrice", event.target.value)}
               placeholder="0.00"
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.itemPrice ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Buyer protection fee (kr)
             <input
               type="number"
               min="0"
               step="0.01"
+              inputMode="decimal"
+              onWheel={blockWheelChange}
               value={draft.buyerProtectionFee}
               onChange={(event) =>
                 updateField("buyerProtectionFee", event.target.value)
               }
               placeholder="0.00"
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.buyerProtectionFee ?? ""}
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Shipping (kr)
             <input
               type="number"
               min="0"
               step="0.01"
+              inputMode="decimal"
+              onWheel={blockWheelChange}
               value={draft.shipping}
               onChange={(event) => updateField("shipping", event.target.value)}
               placeholder="0.00"
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+              className={inputClassName}
             />
-            <p className="min-h-4 text-xs font-medium text-rose-600">
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
               {errors.shipping ?? ""}
             </p>
           </label>
         </div>
 
-        <label className="mt-4 inline-flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={draft.sold}
-            onChange={(event) => updateField("sold", event.target.checked)}
-          />
-          Mark item as sold
+        <label className="mt-4 block max-w-xs space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          Status
+          <select
+            value={draft.status}
+            onChange={(event) => updateStatus(event.target.value as ItemStatus)}
+            className={selectClassName}
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
 
-        {draft.sold ? (
+        {draft.status === "sold" ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-sm text-slate-700">
+            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
               Sold date
               <input
                 type="date"
@@ -326,32 +324,34 @@ export default function ReceiptFormModal({
                 onChange={(event) =>
                   updateField("soldDate", event.target.value)
                 }
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+                className={inputClassName}
               />
-              <p className="min-h-4 text-xs font-medium text-rose-600">
+              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {errors.soldDate ?? ""}
               </p>
             </label>
 
-            <label className="space-y-1 text-sm text-slate-700">
+            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
               Sold price (kr) <span className="text-rose-500">*</span>
               <input
                 type="number"
                 min="0.01"
                 step="0.01"
+                inputMode="decimal"
+                onWheel={blockWheelChange}
                 value={draft.soldPrice}
                 onChange={(event) =>
                   updateField("soldPrice", event.target.value)
                 }
                 placeholder="0.00"
-                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900"
+                className={inputClassName}
               />
-              <p className="min-h-4 text-xs font-medium text-rose-600">
+              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {errors.soldPrice ?? ""}
               </p>
             </label>
 
-            <label className="space-y-1 text-sm text-slate-700 sm:col-span-2">
+            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300 sm:col-span-2">
               Sold platform
               <EditableSelect
                 value={draft.soldPlatform}
@@ -360,7 +360,7 @@ export default function ReceiptFormModal({
                 selectClassName={selectClassName}
                 inputClassName={inputClassName}
               />
-              <p className="min-h-4 text-xs font-medium text-rose-600">
+              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {errors.soldPlatform ?? ""}
               </p>
             </label>

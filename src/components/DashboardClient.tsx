@@ -1,18 +1,8 @@
 "use client";
 
 import { FirebaseError } from "firebase/app";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { doc, deleteDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
@@ -20,6 +10,7 @@ import {
   BanknoteArrowDown,
   BanknoteArrowUp,
   ChartLine,
+  ChevronDown,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -27,21 +18,25 @@ import Modal from "@/components/Modal";
 import ReceiptFormModal from "@/components/ReceiptFormModal";
 import ReceiptTable from "@/components/ReceiptTable";
 import TopNav from "@/components/TopNav";
-import { auth, db } from "@/firebaseConfig";
+import { auth } from "@/firebaseConfig";
+import { useReceipts } from "@/hooks/useReceipts";
 import type { ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
-import {
-  createEmptyRow,
-  normalizeAIParsed,
-  toFirestoreItem,
-} from "@/utils/receipt";
+import { createEmptyRow, normalizeAIParsed } from "@/utils/receipt";
 import InventoryChat from "./InventoryChat";
 
 export default function DashboardClient() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [rows, setRows] = useState<ReceiptRow[]>([]);
+  const {
+    router,
+    user,
+    authReady,
+    rows,
+    setRows,
+    isRowsLoading,
+    loadError,
+    receiptsCollection,
+    saveRowToFirestore,
+  } = useReceipts();
 
   const [purchaseStatusMessage, setPurchaseStatusMessage] = useState("");
   const [aiSuccessMessage, setAiSuccessMessage] = useState("");
@@ -56,6 +51,8 @@ export default function DashboardClient() {
   const [soldParseTouched, setSoldParseTouched] = useState(false);
   const [soldConfirmOpen, setSoldConfirmOpen] = useState(false);
   const [pendingSoldItems, setPendingSoldItems] = useState<ReceiptRow[]>([]);
+  const [purchaseSectionOpen, setPurchaseSectionOpen] = useState(false);
+  const [soldSectionOpen, setSoldSectionOpen] = useState(false);
 
   const [matchExistingOpen, setMatchExistingOpen] = useState(false);
   const [parsedSoldData, setParsedSoldData] = useState<ReceiptRow | null>(null);
@@ -66,7 +63,6 @@ export default function DashboardClient() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
-  const [isRowsLoading, setIsRowsLoading] = useState(true);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
@@ -78,7 +74,9 @@ export default function DashboardClient() {
   const [detailsRow, setDetailsRow] = useState<ReceiptRow | null>(null);
   const [signOutOpen, setSignOutOpen] = useState(false);
 
-  const receiptsCollection = useMemo(() => collection(db, "items"), []);
+  useEffect(() => {
+    if (loadError) setPurchaseStatusMessage(loadError);
+  }, [loadError]);
 
   const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
@@ -101,83 +99,6 @@ export default function DashboardClient() {
     });
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }, [rows]);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthReady(true);
-      if (!currentUser) {
-        router.replace("/auth");
-      }
-    });
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const loadUserReceipts = async (uid: string) => {
-      try {
-        setIsRowsLoading(true);
-        const snapshot = await getDocs(
-          query(
-            receiptsCollection,
-            where("userId", "==", uid),
-            orderBy("purchaseDate", "desc"),
-          ),
-        );
-        const loadedRows = snapshot.docs.map((docItem) => {
-          const data = docItem.data();
-          return {
-            id: docItem.id,
-            seller: String(data.seller ?? ""),
-            itemName: String(data.itemName ?? data.name ?? ""),
-            item: String(data.item ?? data.name ?? ""),
-            purchaseDate: String(data.purchaseDate ?? ""),
-            platform: String(data.platform ?? ""),
-            purchasePrice: String(data.purchasePrice ?? ""),
-            totalPrice: String(data.totalPrice ?? ""),
-            itemPrice: String(data.itemPrice ?? ""),
-            shipping: String(data.shipping ?? ""),
-            buyerProtectionFee: String(data.buyerProtectionFee ?? ""),
-            paymentMethod: String(data.paymentMethod ?? ""),
-            transactionId: String(data.transactionId ?? ""),
-            sold: Boolean(data.sold ?? data.status === "sold"),
-            soldDate: String(data.soldDate ?? data.sellingDate ?? ""),
-            soldPrice: String(data.soldPrice ?? data.sellingPrice ?? ""),
-            soldPlatform: String(data.soldPlatform ?? ""),
-            soldReceiptText: String(
-              data.soldReceiptText ?? data.sellingReceiptText ?? "",
-            ),
-            notes: String(data.notes ?? ""),
-          } as ReceiptRow;
-        });
-        setRows(loadedRows);
-      } catch (error: unknown) {
-        const loadError = error as FirebaseError;
-        const message = loadError.message ?? "Unknown error";
-        const code = loadError.code ? ` (${loadError.code})` : "";
-        setPurchaseStatusMessage(
-          `Unable to load saved receipts from Firebase${code}: ${message}`,
-        );
-      } finally {
-        setIsRowsLoading(false);
-      }
-    };
-
-    void loadUserReceipts(user.uid);
-  }, [user, receiptsCollection]);
-
-  const saveRowToFirestore = async (row: ReceiptRow) => {
-    if (!user) return;
-    await setDoc(
-      doc(receiptsCollection, row.id),
-      toFirestoreItem(row, user.uid),
-      {
-        merge: true,
-      },
-    );
-  };
 
   const handleSaveModal = async (row: ReceiptRow) => {
     setPurchaseStatusMessage("");
@@ -315,6 +236,7 @@ export default function DashboardClient() {
 
       const soldParsed: ReceiptRow = {
         ...firstParsed,
+        status: "sold",
         sold: true,
         soldDate:
           firstParsed.soldDate || new Date().toISOString().split("T")[0],
@@ -369,6 +291,7 @@ export default function DashboardClient() {
       if (!existingRow) throw new Error("Item not found");
       const updatedRow: ReceiptRow = {
         ...existingRow,
+        status: "sold",
         sold: true,
         soldDate: parsedSoldData.soldDate,
         soldPrice: parsedSoldData.soldPrice,
@@ -470,7 +393,7 @@ export default function DashboardClient() {
   const parseError = parseTouched && !receiptText.trim();
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
       <div className="mx-auto max-w-7xl px-6 py-10">
         <TopNav
           appName="ReceiptAI"
@@ -480,52 +403,64 @@ export default function DashboardClient() {
         />
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Sold items</p>
-              <BadgeCheck className="h-5 w-5 text-blue-600" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Sold items
+              </p>
+              <BadgeCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">
+            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
               {isRowsLoading ? "-" : rows.filter((row) => row.sold).length}
             </p>
           </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Current inventory</p>
-              <Archive className="h-5 w-5 text-purple-600" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Current inventory
+              </p>
+              <Archive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">
+            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
               {isRowsLoading ? "-" : rows.filter((row) => !row.sold).length}
             </p>
           </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Total spent</p>
-              <BanknoteArrowDown className="h-5 w-5 text-orange-600" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Total spent
+              </p>
+              <BanknoteArrowDown className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">
+            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
               {isRowsLoading ? "-" : formatSek(totalSpent)}
             </p>
           </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Total earned</p>
-              <BanknoteArrowUp className="h-5 w-5 text-blue-600" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Total earned
+              </p>
+              <BanknoteArrowUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">
+            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
               {isRowsLoading ? "-" : formatSek(totalEarned)}
             </p>
           </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Profit</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Profit
+              </p>
               <ChartLine
-                className={`h-5 w-5 ${profit >= 0 ? "text-emerald-600" : "text-rose-700"}`}
+                className={`h-5 w-5 ${profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
               />
             </div>
             <p
               className={`mt-2 text-3xl font-semibold ${
-                profit >= 0 ? "text-emerald-600" : "text-rose-700"
+                profit >= 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
               }`}
             >
               {isRowsLoading ? "-" : formatSek(profit)}
@@ -536,126 +471,165 @@ export default function DashboardClient() {
         <section className="mt-10 space-y-8">
           <InventoryChat rows={rows} />
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold">Paste purchase receipt</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Paste your receipt text and let Google AI extract structured
-                item details.
-              </p>
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setPurchaseSectionOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-3xl px-6 py-6 text-left"
+              >
+                <div>
+                  <h2 className="text-2xl font-semibold dark:text-slate-50">
+                    Paste purchase receipt
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Paste your receipt text and let Google AI extract structured
+                    item details.
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`h-5 w-5 flex-shrink-0 cursor-pointer text-slate-400 transition-transform ${
+                    purchaseSectionOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
 
-              <textarea
-                value={receiptText}
-                onChange={(event) => {
-                  setReceiptText(event.target.value);
-                  setAiSuccessMessage("");
-                  if (event.target.value.trim()) {
-                    setParseTouched(false);
-                  }
-                }}
-                rows={10}
-                className="mt-4 max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900"
-                placeholder="Copy in receipt text here..."
-                disabled={aiLoading}
-              />
-              <div className="mt-2 h-5">
-                {parseError ? (
-                  <p className="text-sm font-medium text-rose-600">
-                    Copy in receipt text before parsing.
-                  </p>
-                ) : null}
-              </div>
+              {purchaseSectionOpen ? (
+                <div className="flex flex-col px-6 pb-6">
+                  <textarea
+                    value={receiptText}
+                    onChange={(event) => {
+                      setReceiptText(event.target.value);
+                      setAiSuccessMessage("");
+                      if (event.target.value.trim()) {
+                        setParseTouched(false);
+                      }
+                    }}
+                    rows={10}
+                    className="max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400"
+                    placeholder="Copy in receipt text here..."
+                    disabled={aiLoading}
+                  />
+                  <div className="mt-2 h-5">
+                    {parseError ? (
+                      <p className="text-sm font-medium text-rose-600 dark:text-rose-400">
+                        Copy in receipt text before parsing.
+                      </p>
+                    ) : null}
+                  </div>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  onClick={handleParseWithAI}
-                  disabled={aiLoading}
-                  className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
-                >
-                  {aiLoading ? (
-                    <LoadingSpinner label="Parsing with AI..." size={18} />
-                  ) : (
-                    "Parse with Google AI"
-                  )}
-                </button>
-              </div>
-              <div className="mt-3 h-10">
-                {purchaseStatusMessage && !parseError ? (
-                  <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800">
-                    {purchaseStatusMessage}
-                  </p>
-                ) : aiSuccessMessage ? (
-                  <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
-                    {aiSuccessMessage}
-                  </p>
-                ) : null}
-              </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={handleParseWithAI}
+                      disabled={aiLoading}
+                      className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                    >
+                      {aiLoading ? (
+                        <LoadingSpinner label="Parsing with AI..." size={18} />
+                      ) : (
+                        "Parse with Google AI"
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-3 h-10">
+                    {purchaseStatusMessage && !parseError ? (
+                      <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800 dark:bg-rose-950/50 dark:text-rose-300">
+                        {purchaseStatusMessage}
+                      </p>
+                    ) : aiSuccessMessage ? (
+                      <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        {aiSuccessMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold">Paste sold receipt</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Paste your sold item receipt and let Google AI extract the sale
-                details.
-              </p>
+            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setSoldSectionOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-3xl px-6 py-6 text-left"
+              >
+                <div>
+                  <h2 className="text-2xl font-semibold dark:text-slate-50">
+                    Paste sold receipt
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Paste your sold item receipt and let Google AI extract the
+                    sale details.
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`h-5 w-5 flex-shrink-0 cursor-pointer text-slate-400 transition-transform ${
+                    soldSectionOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
 
-              <textarea
-                value={soldReceiptText}
-                onChange={(event) => {
-                  setSoldReceiptText(event.target.value);
-                  setSoldAiSuccessMessage("");
-                  if (event.target.value.trim()) {
-                    setSoldParseTouched(false);
-                  }
-                }}
-                rows={10}
-                className="mt-4 max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900"
-                placeholder="Copy in sold receipt text here..."
-                disabled={soldAiLoading}
-              />
-              <div className="mt-2 h-5">
-                {soldParseTouched && !soldReceiptText.trim() ? (
-                  <p className="text-sm font-medium text-rose-600">
-                    Copy in receipt text before parsing.
-                  </p>
-                ) : null}
-              </div>
+              {soldSectionOpen ? (
+                <div className="flex flex-col px-6 pb-6">
+                  <textarea
+                    value={soldReceiptText}
+                    onChange={(event) => {
+                      setSoldReceiptText(event.target.value);
+                      setSoldAiSuccessMessage("");
+                      if (event.target.value.trim()) {
+                        setSoldParseTouched(false);
+                      }
+                    }}
+                    rows={10}
+                    className="max-h-80 w-full flex-1 resize-none overflow-y-auto rounded-3xl border border-slate-300 bg-slate-50 px-4 py-4 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400"
+                    placeholder="Copy in sold receipt text here..."
+                    disabled={soldAiLoading}
+                  />
+                  <div className="mt-2 h-5">
+                    {soldParseTouched && !soldReceiptText.trim() ? (
+                      <p className="text-sm font-medium text-rose-600 dark:text-rose-400">
+                        Copy in receipt text before parsing.
+                      </p>
+                    ) : null}
+                  </div>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  onClick={handleParseSoldWithAI}
-                  disabled={soldAiLoading}
-                  className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
-                >
-                  {soldAiLoading ? (
-                    <LoadingSpinner label="Parsing with AI..." size={18} />
-                  ) : (
-                    "Parse with Google AI"
-                  )}
-                </button>
-              </div>
-              <div className="mt-3 h-10">
-                {soldStatusMessage ? (
-                  <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800">
-                    {soldStatusMessage}
-                  </p>
-                ) : soldAiSuccessMessage ? (
-                  <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
-                    {soldAiSuccessMessage}
-                  </p>
-                ) : null}
-              </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={handleParseSoldWithAI}
+                      disabled={soldAiLoading}
+                      className="inline-flex min-w-52 cursor-pointer items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                    >
+                      {soldAiLoading ? (
+                        <LoadingSpinner label="Parsing with AI..." size={18} />
+                      ) : (
+                        "Parse with Google AI"
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-3 h-10">
+                    {soldStatusMessage ? (
+                      <p className="inline-flex rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-800 dark:bg-rose-950/50 dark:text-rose-300">
+                        {soldStatusMessage}
+                      </p>
+                    ) : soldAiSuccessMessage ? (
+                      <p className="inline-flex rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        {soldAiSuccessMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
           {isRowsLoading ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <LoadingSpinner label="Loading items..." size={24} />
             </div>
           ) : (
             <ReceiptTable
               rows={rows}
+              platformOptions={platformOptions}
               onCreate={openCreateModal}
               onEdit={openEditModal}
               onDelete={requestDelete}
@@ -709,19 +683,19 @@ export default function DashboardClient() {
         }}
       >
         <div className="space-y-5">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Select an existing inventory item to mark as sold and merge the sale
             details into it.
           </p>
 
           {parsedSoldData && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 dark:border-slate-800 dark:bg-slate-800/50">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Parsed sale details
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                  <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                     Sold Price (SEK) <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -735,21 +709,21 @@ export default function DashboardClient() {
                         setMatchSoldPriceError("");
                       }
                     }}
-                    className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 ${
+                    className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400 ${
                       matchSoldPriceError
                         ? "border-rose-400"
-                        : "border-slate-300"
+                        : "border-slate-300 dark:border-slate-700"
                     }`}
                     placeholder="0"
                   />
                   {matchSoldPriceError && (
-                    <p className="mt-1 text-xs font-medium text-rose-600">
+                    <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">
                       {matchSoldPriceError}
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                  <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                     Sold Date
                   </label>
                   <input
@@ -760,11 +734,11 @@ export default function DashboardClient() {
                         prev ? { ...prev, soldDate: e.target.value } : prev,
                       )
                     }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                  <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                     Platform (optional)
                   </label>
                   <input
@@ -775,7 +749,7 @@ export default function DashboardClient() {
                         prev ? { ...prev, soldPlatform: e.target.value } : prev,
                       )
                     }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                     placeholder="Tradera, Vinted, eBay, etc."
                   />
                 </div>
@@ -784,7 +758,7 @@ export default function DashboardClient() {
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Inventory item <span className="text-rose-500">*</span>
             </label>
             {inventoryItems.length > 0 ? (
@@ -794,7 +768,7 @@ export default function DashboardClient() {
                   setSelectedExistingId(e.target.value);
                   if (e.target.value) setMatchLinkError("");
                 }}
-                className="w-full cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-900"
+                className="w-full cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
               >
                 <option value="" disabled>
                   — Select an item —
@@ -810,13 +784,13 @@ export default function DashboardClient() {
                 ))}
               </select>
             ) : (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
                 No unsold inventory items found. Add a purchase receipt first
                 before linking a sale.
               </div>
             )}
             {matchLinkError && (
-              <p className="mt-1 text-xs font-medium text-rose-600">
+              <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-400">
                 {matchLinkError}
               </p>
             )}
@@ -831,7 +805,7 @@ export default function DashboardClient() {
                 setMatchLinkError("");
                 setMatchSoldPriceError("");
               }}
-              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -839,7 +813,7 @@ export default function DashboardClient() {
               type="button"
               onClick={() => void handleMatchExistingConfirm()}
               disabled={isSavingItem || inventoryItems.length === 0}
-              className="flex-1 cursor-pointer rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+              className="flex-1 cursor-pointer rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
             >
               {isSavingItem ? "Saving..." : "Mark as sold"}
             </button>
@@ -853,14 +827,14 @@ export default function DashboardClient() {
         onClose={handleSoldConfirmCancel}
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Review and edit the sold item details before confirming.
           </p>
           <div className="max-h-96 space-y-4 overflow-y-auto">
             {pendingSoldItems.map((item, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
               >
                 <div className="mb-3 flex items-center justify-between">
                   <input
@@ -874,13 +848,13 @@ export default function DashboardClient() {
                       };
                       setPendingSoldItems(newItems);
                     }}
-                    className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-slate-900"
+                    className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                     placeholder="Item name"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                       Sold Price (SEK)
                     </label>
                     <input
@@ -894,12 +868,12 @@ export default function DashboardClient() {
                         };
                         setPendingSoldItems(newItems);
                       }}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                       placeholder="0"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                       Sold Date
                     </label>
                     <input
@@ -913,11 +887,11 @@ export default function DashboardClient() {
                         };
                         setPendingSoldItems(newItems);
                       }}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                       Platform (optional)
                     </label>
                     <input
@@ -931,7 +905,7 @@ export default function DashboardClient() {
                         };
                         setPendingSoldItems(newItems);
                       }}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
                       placeholder="Tradera, Vinted, eBay, etc."
                     />
                   </div>
@@ -943,7 +917,7 @@ export default function DashboardClient() {
             <button
               type="button"
               onClick={handleSoldConfirmCancel}
-              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="flex-1 cursor-pointer rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -965,50 +939,56 @@ export default function DashboardClient() {
         onClose={() => setDetailsOpen(false)}
       >
         <div className="space-y-4 text-sm">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Bought information
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-slate-500">Seller</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">Seller</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.seller || "-"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Payment method</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">
+                  Payment method
+                </p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.paymentMethod || "-"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Item price</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">Item price</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.itemPrice
                     ? formatSek(Number(detailsRow.itemPrice) || 0)
                     : "-"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Buyer protection fee</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">
+                  Buyer protection fee
+                </p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.buyerProtectionFee
                     ? formatSek(Number(detailsRow.buyerProtectionFee) || 0)
                     : "-"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Shipping</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">Shipping</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.shipping
                     ? formatSek(Number(detailsRow.shipping) || 0)
                     : "-"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Total price</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">
+                  Total price
+                </p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.totalPrice
                     ? formatSek(Number(detailsRow.totalPrice) || 0)
                     : detailsRow?.purchasePrice
@@ -1017,8 +997,8 @@ export default function DashboardClient() {
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Platform</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-slate-500 dark:text-slate-400">Platform</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.platform || "-"}
                 </p>
               </div>
@@ -1026,38 +1006,44 @@ export default function DashboardClient() {
           </div>
 
           {detailsRow?.sold ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Sold information
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-slate-500">Sold platform</p>
-                  <p className="font-medium text-slate-900">
+                  <p className="text-slate-500 dark:text-slate-400">
+                    Sold platform
+                  </p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
                     {detailsRow?.soldPlatform || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Sold price</p>
-                  <p className="font-medium text-slate-900">
+                  <p className="text-slate-500 dark:text-slate-400">
+                    Sold price
+                  </p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
                     {detailsRow?.soldPrice
                       ? formatSek(Number(detailsRow.soldPrice) || 0)
                       : "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Sold date</p>
-                  <p className="font-medium text-slate-900">
+                  <p className="text-slate-500 dark:text-slate-400">
+                    Sold date
+                  </p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
                     {detailsRow?.soldDate || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Status</p>
+                  <p className="text-slate-500 dark:text-slate-400">Status</p>
                   <span
                     className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
                       detailsRow?.sold
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-emerald-100 text-emerald-700"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
                     }`}
                   >
                     {detailsRow?.sold ? "sold" : "available"}

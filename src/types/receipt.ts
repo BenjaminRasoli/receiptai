@@ -1,3 +1,5 @@
+export type ItemStatus = "available" | "on_hold" | "not_for_sale" | "sold";
+
 export type ReceiptRow = {
   id: string;
   seller: string;
@@ -12,6 +14,7 @@ export type ReceiptRow = {
   buyerProtectionFee: string;
   paymentMethod: string;
   transactionId: string;
+  status: ItemStatus;
   sold: boolean;
   soldDate: string;
   soldPrice: string;

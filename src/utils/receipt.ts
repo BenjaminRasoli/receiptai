@@ -1,9 +1,96 @@
-import type { ReceiptRow } from "@/types/receipt";
+import type { ItemStatus, ReceiptRow } from "@/types/receipt";
 
 export const createId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
+
+export const getToday = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export const STATUS_OPTIONS: { value: ItemStatus; label: string }[] = [
+  { value: "available", label: "Available" },
+  { value: "on_hold", label: "On hold" },
+  { value: "not_for_sale", label: "Not for sale" },
+  { value: "sold", label: "Sold" },
+];
+
+export const STATUS_META: Record<
+  ItemStatus,
+  { label: string; badgeClassName: string }
+> = {
+  available: {
+    label: "Available",
+    badgeClassName:
+      "bg-emerald-200 text-emerald-900 dark:bg-emerald-800/70 dark:text-emerald-200",
+  },
+  on_hold: {
+    label: "On hold",
+    badgeClassName:
+      "bg-amber-200 text-amber-900 dark:bg-amber-800/70 dark:text-amber-200",
+  },
+  not_for_sale: {
+    label: "Not for sale",
+    badgeClassName:
+      "bg-slate-300 text-slate-900 dark:bg-slate-700 dark:text-slate-200",
+  },
+  sold: {
+    label: "Sold",
+    badgeClassName:
+      "bg-rose-200 text-rose-900 dark:bg-rose-800/70 dark:text-rose-200",
+  },
+};
+
+const STATUS_RANK: Record<ItemStatus, number> = {
+  available: 0,
+  on_hold: 1,
+  not_for_sale: 2,
+  sold: 3,
+};
+
+export const statusRank = (status: ItemStatus) => STATUS_RANK[status] ?? 0;
+
+/** Resolves a status coming out of Firestore, falling back to the old
+ * boolean `sold` field for documents written before status existed. */
+export const parseStoredStatus = (
+  rawStatus: unknown,
+  soldFallback: boolean,
+): ItemStatus => {
+  const value = String(rawStatus ?? "");
+  const known = STATUS_OPTIONS.map((option) => option.value) as string[];
+  if (known.includes(value)) return value as ItemStatus;
+  return soldFallback ? "sold" : "available";
+};
+
+/** Applies a new status to a row, keeping `sold` in sync and clearing
+ * sold-only fields when moving away from "sold" (mirrors the old checkbox
+ * behavior). */
+export const applyStatus = (
+  row: ReceiptRow,
+  status: ItemStatus,
+): ReceiptRow => {
+  if (status === "sold") {
+    return {
+      ...row,
+      status,
+      sold: true,
+      soldDate: row.soldDate || getToday(),
+    };
+  }
+  return {
+    ...row,
+    status,
+    sold: false,
+    soldDate: "",
+    soldPrice: "",
+    soldPlatform: "",
+  };
+};
 
 export const createEmptyRow = (): ReceiptRow => ({
   id: createId(),
@@ -19,6 +106,7 @@ export const createEmptyRow = (): ReceiptRow => ({
   buyerProtectionFee: "",
   paymentMethod: "",
   transactionId: "",
+  status: "available",
   sold: false,
   soldDate: "",
   soldPrice: "",
@@ -30,7 +118,8 @@ export const createEmptyRow = (): ReceiptRow => ({
 export const normalizeAIParsed = (item: unknown): ReceiptRow => {
   const result = item as Record<string, unknown>;
   const seller = String(result.seller ?? "").trim();
-  const itemName = String(result.itemName ?? result.item ?? "").trim() || "Item";
+  const itemName =
+    String(result.itemName ?? result.item ?? "").trim() || "Item";
   const purchaseDate = String(
     result.paymentDate ?? result.purchaseDate ?? result.date ?? "",
   ).trim();
@@ -53,6 +142,7 @@ export const normalizeAIParsed = (item: unknown): ReceiptRow => {
     buyerProtectionFee: String(result.buyerProtectionFee ?? "").trim(),
     paymentMethod,
     transactionId: String(result.transactionId ?? "").trim(),
+    status: "available",
     sold: false,
     soldDate: "",
     soldPrice: "",
@@ -74,7 +164,8 @@ export const toFirestoreItem = (
     name: row.item || row.itemName || "",
     userId,
     purchasePrice: Number(row.purchasePrice) || 0,
-    status: row.sold ? "sold" : "available",
+    status: row.status,
+    sold: row.status === "sold",
     sellingPrice: row.soldPrice ? Number(row.soldPrice) : null,
     sellingDate: row.soldDate || null,
     soldPlatform: row.soldPlatform || null,

@@ -36,8 +36,8 @@ export default function ConfirmModal({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className={`cursor-pointer rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 ${
-              isLoading ? "" : "hover:bg-slate-200"
+            className={`cursor-pointer rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
+              isLoading ? "" : "hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
             {cancelLabel}
@@ -49,7 +49,7 @@ export default function ConfirmModal({
             className={`cursor-pointer rounded-2xl px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
               confirmVariant === "danger"
                 ? `bg-rose-700 ${isLoading ? "" : "hover:bg-rose-800"}`
-                : `bg-slate-950 ${isLoading ? "" : "hover:bg-slate-800"}`
+                : `bg-slate-950 dark:bg-slate-100 dark:text-slate-900 ${isLoading ? "" : "hover:bg-slate-800 dark:hover:bg-slate-300"}`
             }`}
           >
             {isLoading ? "Please wait..." : confirmLabel}
@@ -57,7 +57,7 @@ export default function ConfirmModal({
         </>
       }
     >
-      <p className="text-sm text-slate-700">{message}</p>
+      <p className="text-sm text-slate-700 dark:text-slate-300">{message}</p>
     </Modal>
   );
 }

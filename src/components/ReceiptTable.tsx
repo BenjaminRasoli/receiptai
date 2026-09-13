@@ -1,23 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
-import type { ReceiptRow } from "@/types/receipt";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from "lucide-react";
+import type { ItemStatus, ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
+import { STATUS_META, STATUS_OPTIONS, statusRank } from "@/utils/receipt";
 
-type SortKey = "item" | "purchaseDate" | "soldDate" | "status";
+type SortKey =
+  | "item"
+  | "purchaseDate"
+  | "platform"
+  | "totalPrice"
+  | "status"
+  | "soldDate"
+  | "soldPrice";
 type SortDir = "asc" | "desc";
 
 type Props = {
   rows: ReceiptRow[];
+  platformOptions: string[];
   onCreate: () => void;
   onEdit: (row: ReceiptRow) => void;
   onDelete: (row: ReceiptRow) => void;
   onShowDetails: (row: ReceiptRow) => void;
 };
 
+const getTotal = (row: ReceiptRow) =>
+  Number(row.totalPrice || row.purchasePrice) || 0;
+
 export default function ReceiptTable({
   rows,
+  platformOptions,
   onCreate,
   onEdit,
   onDelete,
@@ -26,6 +39,11 @@ export default function ReceiptTable({
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("purchaseDate");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const [statusFilter, setStatusFilter] = useState<Set<ItemStatus>>(new Set());
+  const [platformFilter, setPlatformFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -36,30 +54,110 @@ export default function ReceiptTable({
     }
   };
 
-  const filtered = useMemo(() => {
+  const toggleStatusFilter = (status: ItemStatus) => {
+    setStatusFilter((current) => {
+      const next = new Set(current);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setStatusFilter(new Set());
+    setPlatformFilter("");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const hasActiveFilters =
+    statusFilter.size > 0 || platformFilter || dateFrom || dateTo;
+
+
+  const preStatusFiltered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return rows.filter(
-      (row) =>
-        !q ||
-        (row.item || "").toLowerCase().includes(q) ||
-        (row.platform || "").toLowerCase().includes(q) ||
-        (row.purchaseDate || "").includes(q),
+    return rows.filter((row) => {
+      if (q) {
+        const matchesSearch =
+          (row.item || "").toLowerCase().includes(q) ||
+          (row.platform || "").toLowerCase().includes(q) ||
+          (row.purchaseDate || "").includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      if (platformFilter && row.platform !== platformFilter) {
+        return false;
+      }
+
+      if (dateFrom && row.purchaseDate && row.purchaseDate < dateFrom) {
+        return false;
+      }
+      if (dateTo && row.purchaseDate && row.purchaseDate > dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [rows, search, platformFilter, dateFrom, dateTo]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<ItemStatus, number> = {
+      available: 0,
+      on_hold: 0,
+      not_for_sale: 0,
+      sold: 0,
+    };
+    preStatusFiltered.forEach((row) => {
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
+    });
+    return counts;
+  }, [preStatusFiltered]);
+
+  const filtered = useMemo(() => {
+    if (statusFilter.size === 0) return preStatusFiltered;
+    return preStatusFiltered.filter((row) => statusFilter.has(row.status));
+  }, [preStatusFiltered, statusFilter]);
+
+  const filterSummary = useMemo(() => {
+    const itemsCount = filtered.length;
+    const spent = filtered.reduce((sum, row) => sum + getTotal(row), 0);
+    const soldItems = filtered.filter((row) => row.status === "sold");
+    const earned = soldItems.reduce(
+      (sum, row) => sum + (Number(row.soldPrice) || 0),
+      0,
     );
-  }, [rows, search]);
+    return {
+      itemsCount,
+      spent,
+      earned,
+      profit: earned - spent,
+      soldCount: soldItems.length,
+    };
+  }, [filtered]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      if (sortKey === "status") {
-        const av = a.sold ? 1 : 0;
-        const bv = b.sold ? 1 : 0;
+      let cmp = 0;
 
-        return sortDir === "asc" ? av - bv : bv - av;
+      switch (sortKey) {
+        case "status":
+          cmp = statusRank(a.status) - statusRank(b.status);
+          break;
+        case "totalPrice":
+          cmp = getTotal(a) - getTotal(b);
+          break;
+        case "soldPrice":
+          cmp = (Number(a.soldPrice) || 0) - (Number(b.soldPrice) || 0);
+          break;
+        default: {
+          const av = (a[sortKey] ?? "").toString();
+          const bv = (b[sortKey] ?? "").toString();
+          cmp = av.localeCompare(bv);
+        }
       }
-
-      const av = (a[sortKey] ?? "").toString();
-      const bv = (b[sortKey] ?? "").toString();
-
-      const cmp = av.localeCompare(bv);
 
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -69,25 +167,25 @@ export default function ReceiptTable({
     if (sortKey !== col)
       return <ArrowUpDown className="inline ml-1 h-3 w-3 text-slate-400" />;
     return sortDir === "asc" ? (
-      <ArrowUp className="inline ml-1 h-3 w-3 text-slate-700" />
+      <ArrowUp className="inline ml-1 h-3 w-3 text-slate-700 dark:text-slate-300" />
     ) : (
-      <ArrowDown className="inline ml-1 h-3 w-3 text-slate-700" />
+      <ArrowDown className="inline ml-1 h-3 w-3 text-slate-700 dark:text-slate-300" />
     );
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Receipt items</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 className="text-2xl font-semibold dark:text-slate-50">Receipt items</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Add, edit, and remove items using the modal form.
           </p>
         </div>
         <button
           type="button"
           onClick={onCreate}
-          className="cursor-pointer inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:w-auto sm:px-6 sm:py-3"
+          className="cursor-pointer inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:w-auto sm:px-6 sm:py-3 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
         >
           Add item manually
         </button>
@@ -100,41 +198,147 @@ export default function ReceiptTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by item name, platform, or date…"
-          className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white"
+          className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400 dark:focus:bg-slate-800"
         />
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+        <div className="flex flex-wrap gap-2">
+          {STATUS_OPTIONS.map((option) => {
+            const active = statusFilter.has(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleStatusFilter(option.value)}
+                className={`cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  active
+                    ? "bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-900"
+                    : "bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+                }`}
+              >
+                {option.label} ({statusCounts[option.value] ?? 0})
+              </button>
+            );
+          })}
+        </div>
+
+        <select
+          value={platformFilter}
+          onChange={(e) => setPlatformFilter(e.target.value)}
+          className="cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-slate-400"
+        >
+          <option value="">All platforms</option>
+          {platformOptions.map((platform) => (
+            <option key={platform} value={platform}>
+              {platform}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+          <span>Purchased</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-slate-400"
+          />
+          <span>–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-slate-400"
+          />
+        </div>
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+          >
+            <X className="h-3 w-3" />
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800/50">
+        <span className="font-semibold text-slate-900 dark:text-slate-100">
+          {filterSummary.itemsCount} item
+          {filterSummary.itemsCount === 1 ? "" : "s"}
+        </span>
+        <span className="text-slate-500 dark:text-slate-400">
+          Spent:{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {formatSek(filterSummary.spent)}
+          </span>
+        </span>
+        <span className="text-slate-500 dark:text-slate-400">
+          Earned ({filterSummary.soldCount} sold):{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {formatSek(filterSummary.earned)}
+          </span>
+        </span>
+        <span
+          className={`font-semibold ${
+            filterSummary.profit >= 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-rose-600 dark:text-rose-400"
+          }`}
+        >
+          Profit: {formatSek(filterSummary.profit)}
+        </span>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-full table-auto text-sm text-slate-900">
-          <thead className="text-left text-slate-700">
-            <tr className="border-b border-slate-200">
+        <table className="w-full min-w-full table-auto text-sm text-slate-900 dark:text-slate-100">
+          <thead className="text-left text-slate-700 dark:text-slate-300">
+            <tr className="border-b border-slate-200 dark:border-slate-800">
               <th
-                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent"
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
                 onClick={() => handleSort("item")}
               >
                 Item <SortIcon col="item" />
               </th>
               <th
-                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent"
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
                 onClick={() => handleSort("purchaseDate")}
               >
                 Purchase date <SortIcon col="purchaseDate" />
               </th>
-              <th className="whitespace-nowrap px-3 py-3">Platform</th>
-              <th className="whitespace-nowrap px-3 py-3">Total price</th>
               <th
-                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent"
-                onClick={() => handleSort("status")}
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
+                onClick={() => handleSort("platform")}
               >
-                Sold <SortIcon col="status" />
+                Platform <SortIcon col="platform" />
               </th>
               <th
-                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent"
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
+                onClick={() => handleSort("totalPrice")}
+              >
+                Total price <SortIcon col="totalPrice" />
+              </th>
+              <th
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
+                onClick={() => handleSort("status")}
+              >
+                Status <SortIcon col="status" />
+              </th>
+              <th
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
                 onClick={() => handleSort("soldDate")}
               >
                 Sold date <SortIcon col="soldDate" />
               </th>
-              <th className="whitespace-nowrap px-3 py-3">Sold price</th>
+              <th
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
+                onClick={() => handleSort("soldPrice")}
+              >
+                Sold price <SortIcon col="soldPrice" />
+              </th>
               <th className="whitespace-nowrap px-3 py-3">Actions</th>
             </tr>
           </thead>
@@ -145,75 +349,74 @@ export default function ReceiptTable({
                   colSpan={8}
                   className="px-3 py-8 text-center text-slate-400 text-sm"
                 >
-                  {search ? "No items match your search." : "No items yet."}
+                  {search || hasActiveFilters
+                    ? "No items match your search or filters."
+                    : "No items yet."}
                 </td>
               </tr>
             ) : (
-              sorted.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer align-top transition hover:bg-slate-50 border-b border-slate-200"
-                  onClick={() => onShowDetails(row)}
-                >
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <span className="rounded-lg px-2 py-1 text-slate-900">
-                      {row.item || "-"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {row.purchaseDate || "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {row.platform || "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {row.purchasePrice
-                      ? formatSek(Number(row.purchasePrice) || 0)
-                      : "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        row.sold
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      }`}
-                    >
-                      {row.sold ? "Sold" : "Available"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {row.soldDate || "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {row.soldPrice || "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(row);
-                        }}
-                        className="cursor-pointer rounded-2xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-200"
+              sorted.map((row) => {
+                const statusMeta = STATUS_META[row.status];
+                return (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer align-top transition hover:bg-slate-50 border-b border-slate-200 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    onClick={() => onShowDetails(row)}
+                  >
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <span className="rounded-lg px-2 py-1 text-slate-900 dark:text-slate-100">
+                        {row.item || "-"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {row.purchaseDate || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {row.platform || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {getTotal(row) ? formatSek(getTotal(row)) : "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusMeta.badgeClassName}`}
                       >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(row);
-                        }}
-                        className="cursor-pointer rounded-2xl bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-200"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {statusMeta.label}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {row.soldDate || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      {row.soldPrice || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(row);
+                          }}
+                          className="cursor-pointer rounded-2xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(row);
+                          }}
+                          className="cursor-pointer rounded-2xl bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-950"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
