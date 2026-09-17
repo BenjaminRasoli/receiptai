@@ -21,4 +21,6 @@ export type ReceiptRow = {
   soldPlatform: string;
   soldReceiptText: string;
   notes: string;
+  imageUrl: string;
+  imagePublicId: string;
 };

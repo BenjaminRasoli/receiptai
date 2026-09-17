@@ -78,6 +78,8 @@ export function useReceipts() {
               data.soldReceiptText ?? data.sellingReceiptText ?? "",
             ),
             notes: String(data.notes ?? ""),
+            imageUrl: String(data.imageUrl ?? ""),
+            imagePublicId: String(data.imagePublicId ?? ""),
           } as ReceiptRow;
         });
         setRows(loadedRows);

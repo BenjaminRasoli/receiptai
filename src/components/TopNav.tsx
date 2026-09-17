@@ -54,15 +54,28 @@ export default function TopNav({
         <h1 className="text-2xl font-semibold text-slate-950 dark:text-slate-50">
           {appName}
         </h1>
-        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
-          <span className="max-w-[55vw] truncate text-sm text-slate-600 sm:max-w-none dark:text-slate-400">
+
+        <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
+          <span className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-slate-400 sm:flex-none">
             {email}
           </span>
+
+          <button
+            type="button"
+            onClick={() => void onLogout()}
+            disabled={isLoggingOut}
+            className={`shrink-0 cursor-pointer rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
+              isLoggingOut ? "" : "hover:bg-slate-800 dark:hover:bg-slate-700"
+            }`}
+          >
+            {isLoggingOut ? "Signing out..." : "Sign out"}
+          </button>
+
           <button
             type="button"
             onClick={toggleTheme}
             aria-label="Toggle dark mode"
-            className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="shrink-0 cursor-pointer rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             {isDark ? (
               <Sun className="h-4 w-4" />
@@ -70,18 +83,9 @@ export default function TopNav({
               <Moon className="h-4 w-4" />
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            disabled={isLoggingOut}
-            className={`cursor-pointer rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
-              isLoggingOut ? "" : "hover:bg-slate-800 dark:hover:bg-slate-700"
-            }`}
-          >
-            {isLoggingOut ? "Signing out..." : "Sign out"}
-          </button>
         </div>
       </div>
+
       <div className="flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
         {NAV_LINKS.map((link) => {
           const active = pathname === link.href;

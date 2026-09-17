@@ -55,8 +55,6 @@ const STATUS_RANK: Record<ItemStatus, number> = {
 
 export const statusRank = (status: ItemStatus) => STATUS_RANK[status] ?? 0;
 
-/** Resolves a status coming out of Firestore, falling back to the old
- * boolean `sold` field for documents written before status existed. */
 export const parseStoredStatus = (
   rawStatus: unknown,
   soldFallback: boolean,
@@ -67,9 +65,6 @@ export const parseStoredStatus = (
   return soldFallback ? "sold" : "available";
 };
 
-/** Applies a new status to a row, keeping `sold` in sync and clearing
- * sold-only fields when moving away from "sold" (mirrors the old checkbox
- * behavior). */
 export const applyStatus = (
   row: ReceiptRow,
   status: ItemStatus,
@@ -113,6 +108,8 @@ export const createEmptyRow = (): ReceiptRow => ({
   soldPlatform: "",
   soldReceiptText: "",
   notes: "",
+  imageUrl: "",
+  imagePublicId: "",
 });
 
 export const normalizeAIParsed = (item: unknown): ReceiptRow => {
@@ -149,6 +146,8 @@ export const normalizeAIParsed = (item: unknown): ReceiptRow => {
     soldPlatform: "",
     soldReceiptText: "",
     notes: "",
+    imageUrl: "",
+    imagePublicId: "",
   };
 };
 

@@ -938,6 +938,15 @@ export default function DashboardClient() {
         title={detailsRow?.item || "Item details"}
         onClose={() => setDetailsOpen(false)}
       >
+        {detailsRow?.imageUrl ? (
+          <div className="mb-2 flex justify-center rounded-2xl bg-slate-100 p-3 dark:bg-slate-800">
+            <img
+              src={detailsRow.imageUrl}
+              alt={detailsRow.item}
+              className="max-h-64 w-auto rounded-xl object-contain"
+            />
+          </div>
+        ) : null}
         <div className="space-y-4 text-sm">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">

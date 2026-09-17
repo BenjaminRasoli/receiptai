@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, type WheelEvent } from "react";
+import { useEffect, useRef, useState, type WheelEvent } from "react";
 import Modal from "@/components/Modal";
 import type { ItemStatus, ReceiptRow } from "@/types/receipt";
 import { applyStatus, createEmptyRow, STATUS_OPTIONS } from "@/utils/receipt";
 import EditableSelect from "./Editableselect";
+import { uploadReceiptImage } from "@/utils/receiptImage";
 
 type Props = {
   isOpen: boolean;
@@ -30,6 +31,8 @@ const selectClassName =
   "w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
 const inputClassName =
   "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
+const fileInputClassName =
+  "h-12 min-w-0 w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-900 outline-none transition file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-200 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-300 focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-slate-700 dark:file:text-slate-200 dark:hover:file:bg-slate-600 dark:focus:border-slate-400";
 
 const blockWheelChange = (e: WheelEvent<HTMLInputElement>) => {
   e.currentTarget.blur();
@@ -49,21 +52,28 @@ export default function ReceiptFormModal({
     ...createEmptyRow(),
     purchaseDate: getToday(),
   }));
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
     if (mode === "edit" && initialRow) {
       setDraft(initialRow);
+      setImagePreview(initialRow.imageUrl || "");
+      setImageFile(null);
+      setErrors({});
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    setDraft({
-      ...createEmptyRow(),
-      purchaseDate: getToday(),
-    });
-
+    setDraft({ ...createEmptyRow(), purchaseDate: getToday() });
+    setImagePreview("");
+    setImageFile(null);
     setErrors({});
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, [isOpen, mode, initialRow]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -82,6 +92,22 @@ export default function ReceiptFormModal({
       soldPrice: "",
       soldPlatform: "",
     }));
+  };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setErrors((current) => ({ ...current, image: "" }));
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    setDraft((current) => ({ ...current, imageUrl: "", imagePublicId: "" }));
+    setErrors((current) => ({ ...current, image: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const validate = () => {
@@ -125,9 +151,11 @@ export default function ReceiptFormModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingImage}
             className={`cursor-pointer rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
-              isSaving ? "" : "hover:bg-slate-200 dark:hover:bg-slate-700"
+              isSaving || isUploadingImage
+                ? ""
+                : "hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
             Cancel
@@ -135,26 +163,48 @@ export default function ReceiptFormModal({
           <button
             type="submit"
             form="receipt-form"
-            disabled={isSaving}
+            disabled={isSaving || isUploadingImage}
             className={`cursor-pointer rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 ${
-              isSaving ? "" : "hover:bg-slate-800 dark:hover:bg-slate-700"
+              isSaving || isUploadingImage
+                ? ""
+                : "hover:bg-slate-800 dark:hover:bg-slate-700"
             }`}
           >
-            {isSaving
-              ? "Saving..."
-              : mode === "create"
-                ? "Create item"
-                : "Save changes"}
+            {isUploadingImage
+              ? "Uploading photo..."
+              : isSaving
+                ? "Saving..."
+                : mode === "create"
+                  ? "Create item"
+                  : "Save changes"}
           </button>
         </>
       }
     >
       <form
         id="receipt-form"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           if (!validate()) return;
-          void onSave(draft);
+
+          let finalRow = draft;
+          if (imageFile) {
+            setIsUploadingImage(true);
+            try {
+              const { url, publicId } = await uploadReceiptImage(imageFile);
+              finalRow = { ...draft, imageUrl: url, imagePublicId: publicId };
+            } catch {
+              setErrors((current) => ({
+                ...current,
+                image: "Image upload failed. Try again.",
+              }));
+              setIsUploadingImage(false);
+              return;
+            }
+            setIsUploadingImage(false);
+          }
+
+          void onSave(finalRow);
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -169,6 +219,52 @@ export default function ReceiptFormModal({
               {errors.item ?? ""}
             </p>
           </label>
+
+          <div className="min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+            <label htmlFor="receipt-image">Photo</label>
+
+            {imagePreview ? (
+              <div className="flex min-w-0 gap-3">
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <img
+                    src={imagePreview}
+                    alt="Item preview"
+                    className="h-12 w-12 rounded-xl object-cover border-slate-300 border dark:border-slate-700"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="w-fit cursor-pointer border-0 bg-transparent p-0 text-xs font-semibold leading-none text-rose-600 hover:underline dark:text-rose-400"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <input
+                  id="receipt-image"
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                  className={`${fileInputClassName} min-w-0 flex-1`}
+                />
+              </div>
+            ) : (
+              <input
+                id="receipt-image"
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className={fileInputClassName}
+              />
+            )}
+
+            <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
+              {errors.image ?? ""}
+            </p>
+          </div>
 
           <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
             Seller
