@@ -22,3 +22,20 @@ export async function uploadReceiptImage(file: File) {
     publicId: data.public_id as string,
   };
 }
+
+export function getCloudinaryThumbnail(
+  url: string | undefined | null,
+  size = 80,
+): string {
+  if (!url) return "";
+
+  const marker = "/upload/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
+
+  const transform = `w_${size},h_${size},c_fill,g_auto,q_auto,f_auto,dpr_auto`;
+  const before = url.slice(0, idx + marker.length);
+  const after = url.slice(idx + marker.length);
+
+  return `${before}${transform}/${after}`;
+}

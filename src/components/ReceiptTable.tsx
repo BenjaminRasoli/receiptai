@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type { ItemStatus, ReceiptRow } from "@/types/receipt";
+import { getCloudinaryThumbnail } from "@/utils/receiptImage";
 import { formatSek } from "@/utils/format";
 import { STATUS_META, STATUS_OPTIONS, statusRank } from "@/utils/receipt";
 
@@ -211,7 +212,6 @@ export default function ReceiptTable({
         />
       </div>
 
-      {/* Filters: header + content share one box, header only visible on mobile */}
       <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50 sm:p-3">
         <button
           type="button"
@@ -396,24 +396,33 @@ export default function ReceiptTable({
                   <tr
                     key={row.id}
                     className="cursor-pointer align-top transition hover:bg-slate-50 border-b border-slate-200 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    style={{
+                      contentVisibility: "auto",
+                      containIntrinsicSize: "0 56px",
+                    }}
                     onClick={() => onShowDetails(row)}
                   >
                     <td className="whitespace-nowrap px-3 py-3">
                       {row.imageUrl ? (
                         <img
-                          src={row.imageUrl}
+                          src={getCloudinaryThumbnail(row.imageUrl, 80)}
                           alt={row.item}
-                          className="h-10 w-10 rounded-lg object-cover"
+                          width={40}
+                          height={40}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-10 w-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800"
                         />
                       ) : (
                         <div className="h-10 w-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3">
-                      <span className="rounded-lg px-2 py-1 text-slate-900 dark:text-slate-100">
+                      <span className="block max-w-50 truncate rounded-lg px-2 py-1 text-slate-900 dark:text-slate-100">
                         {row.item || "-"}
                       </span>
                     </td>
+
                     <td className="whitespace-nowrap px-3 py-3">
                       {row.purchaseDate || "-"}
                     </td>

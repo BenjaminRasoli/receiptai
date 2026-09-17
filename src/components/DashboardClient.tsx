@@ -24,6 +24,7 @@ import type { ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
 import { createEmptyRow, normalizeAIParsed } from "@/utils/receipt";
 import InventoryChat from "./InventoryChat";
+import { getCloudinaryThumbnail } from "@/utils/receiptImage";
 
 export default function DashboardClient() {
   const {
@@ -74,9 +75,15 @@ export default function DashboardClient() {
   const [detailsRow, setDetailsRow] = useState<ReceiptRow | null>(null);
   const [signOutOpen, setSignOutOpen] = useState(false);
 
+  const [detailsImageLoaded, setDetailsImageLoaded] = useState(false);
+
   useEffect(() => {
     if (loadError) setPurchaseStatusMessage(loadError);
   }, [loadError]);
+
+  useEffect(() => {
+    setDetailsImageLoaded(false);
+  }, [detailsRow?.id]);
 
   const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
@@ -394,7 +401,7 @@ export default function DashboardClient() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
+      <div className="mx-auto max-w-500 px-6 py-10">
         <TopNav
           appName="ReceiptAI"
           email={user.email}
@@ -939,14 +946,29 @@ export default function DashboardClient() {
         onClose={() => setDetailsOpen(false)}
       >
         {detailsRow?.imageUrl ? (
-          <div className="mb-2 flex justify-center rounded-2xl bg-slate-100 p-3 dark:bg-slate-800">
+          <div className="relative mb-2 flex h-72 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-3 dark:bg-slate-800">
+            {/* Loader */}
+            {!detailsImageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-slate-700 dark:border-slate-600 dark:border-t-slate-200" />
+              </div>
+            )}
+
+            {/* Full resolution image */}
             <img
-              src={detailsRow.imageUrl}
+              key={detailsRow.id}
+              src={getCloudinaryThumbnail(detailsRow.imageUrl, 900)}
               alt={detailsRow.item}
-              className="max-h-64 w-auto rounded-xl object-contain"
+              fetchPriority="high"
+              decoding="async"
+              onLoad={() => setDetailsImageLoaded(true)}
+              className={`max-h-[95%] w-auto rounded-xl object-contain transition-opacity duration-300 ${
+                detailsImageLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           </div>
         ) : null}
+
         <div className="space-y-4 text-sm">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -957,6 +979,14 @@ export default function DashboardClient() {
                 <p className="text-slate-500 dark:text-slate-400">Seller</p>
                 <p className="font-medium text-slate-900 dark:text-slate-100">
                   {detailsRow?.seller || "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Purchase date
+                </p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">
+                  {detailsRow?.purchaseDate || "-"}
                 </p>
               </div>
               <div>
