@@ -389,19 +389,23 @@ export default function DashboardClient() {
   }
 
   const totalSpent = rows.reduce(
-    (sum, row) => sum + (Number(row.purchasePrice) || 0),
+    (sum, row) => sum + (Number(row.totalPrice || row.purchasePrice) || 0),
     0,
   );
-  const totalEarned = rows.reduce(
+
+  const soldItems = rows.filter((row) => row.status === "sold");
+
+  const totalEarned = soldItems.reduce(
     (sum, row) => sum + (Number(row.soldPrice) || 0),
     0,
   );
+
   const profit = totalEarned - totalSpent;
   const parseError = parseTouched && !receiptText.trim();
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <div className="mx-auto max-w-500 px-6 py-10">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+      <div className="mx-auto w-full max-w-500 px-4 py-10 sm:px-6">
         <TopNav
           appName="ReceiptAI"
           email={user.email}

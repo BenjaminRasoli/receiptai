@@ -178,8 +178,8 @@ export default function AuthForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`mx-auto cursor-pointer inline-flex w-full max-w-sm items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 ${
-                isSubmitting ? "" : "hover:bg-slate-800 dark:hover:bg-slate-300"
+              className={`mx-auto inline-flex w-full max-w-sm cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 ${
+                isSubmitting ? "" : "hover:bg-slate-50 dark:hover:bg-slate-700"
               }`}
             >
               {isSubmitting ? (

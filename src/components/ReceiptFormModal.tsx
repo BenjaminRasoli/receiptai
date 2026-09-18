@@ -27,10 +27,12 @@ const getToday = () => {
   return `${year}-${month}-${day}`;
 };
 
+const fieldWrapperClassName =
+  "w-full max-w-xs min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-300 sm:max-w-none";
 const selectClassName =
-  "w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
+  "w-full min-w-0 cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
 const inputClassName =
-  "w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
+  "w-full min-w-0 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400";
 const fileInputClassName =
   "h-12 min-w-0 w-full cursor-pointer rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-900 outline-none transition file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-200 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-300 focus:border-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-slate-700 dark:file:text-slate-200 dark:hover:file:bg-slate-600 dark:focus:border-slate-400";
 
@@ -207,8 +209,8 @@ export default function ReceiptFormModal({
           void onSave(finalRow);
         }}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <label className={fieldWrapperClassName}>
             Item <span className="text-rose-500">*</span>
             <input
               value={draft.item}
@@ -220,7 +222,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <div className="min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <div className={fieldWrapperClassName}>
             <label htmlFor="receipt-image">Photo</label>
 
             {imagePreview ? (
@@ -266,7 +268,7 @@ export default function ReceiptFormModal({
             </p>
           </div>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Seller
             <input
               value={draft.seller}
@@ -278,7 +280,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Payment method
             <EditableSelect
               value={draft.paymentMethod}
@@ -292,7 +294,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Platform
             <EditableSelect
               value={draft.platform}
@@ -306,7 +308,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Purchase date
             <input
               type="date"
@@ -314,11 +316,12 @@ export default function ReceiptFormModal({
               onChange={(event) =>
                 updateField("purchaseDate", event.target.value)
               }
-              className={inputClassName}
+              className={`${inputClassName} block appearance-none`}
+              style={{ colorScheme: "light dark" }}
             />
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Purchase price (kr) <span className="text-rose-500">*</span>
             <input
               type="number"
@@ -338,7 +341,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Item price (kr)
             <input
               type="number"
@@ -356,7 +359,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Buyer protection fee (kr)
             <input
               type="number"
@@ -376,7 +379,7 @@ export default function ReceiptFormModal({
             </p>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+          <label className={fieldWrapperClassName}>
             Shipping (kr)
             <input
               type="number"
@@ -393,75 +396,80 @@ export default function ReceiptFormModal({
               {errors.shipping ?? ""}
             </p>
           </label>
+
+          <label className={fieldWrapperClassName}>
+            Status
+            <select
+              value={draft.status}
+              onChange={(event) =>
+                updateStatus(event.target.value as ItemStatus)
+              }
+              className={selectClassName}
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {draft.status === "sold" ? (
+            <>
+              <label className={fieldWrapperClassName}>
+                Sold date
+                <input
+                  type="date"
+                  value={draft.soldDate}
+                  onChange={(event) =>
+                    updateField("soldDate", event.target.value)
+                  }
+                  className={`${inputClassName} block appearance-none`}
+                  style={{ colorScheme: "light dark" }}
+                />
+                <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  {errors.soldDate ?? ""}
+                </p>
+              </label>
+
+              <label className={fieldWrapperClassName}>
+                Sold price (kr) <span className="text-rose-500">*</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  onWheel={blockWheelChange}
+                  value={draft.soldPrice}
+                  onChange={(event) =>
+                    updateField("soldPrice", event.target.value)
+                  }
+                  placeholder="0.00"
+                  className={inputClassName}
+                />
+                <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  {errors.soldPrice ?? ""}
+                </p>
+              </label>
+
+              <label
+                className={`${fieldWrapperClassName} sm:col-span-2 sm:max-w-none`}
+              >
+                Sold platform
+                <EditableSelect
+                  value={draft.soldPlatform}
+                  options={platformOptions}
+                  onChange={(value) => updateField("soldPlatform", value)}
+                  selectClassName={selectClassName}
+                  inputClassName={inputClassName}
+                />
+                <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
+                  {errors.soldPlatform ?? ""}
+                </p>
+              </label>
+            </>
+          ) : null}
         </div>
-
-        <label className="mt-4 block max-w-xs space-y-1 text-sm text-slate-700 dark:text-slate-300">
-          Status
-          <select
-            value={draft.status}
-            onChange={(event) => updateStatus(event.target.value as ItemStatus)}
-            className={selectClassName}
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {draft.status === "sold" ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
-              Sold date
-              <input
-                type="date"
-                value={draft.soldDate}
-                onChange={(event) =>
-                  updateField("soldDate", event.target.value)
-                }
-                className={inputClassName}
-              />
-              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
-                {errors.soldDate ?? ""}
-              </p>
-            </label>
-
-            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
-              Sold price (kr) <span className="text-rose-500">*</span>
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                inputMode="decimal"
-                onWheel={blockWheelChange}
-                value={draft.soldPrice}
-                onChange={(event) =>
-                  updateField("soldPrice", event.target.value)
-                }
-                placeholder="0.00"
-                className={inputClassName}
-              />
-              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
-                {errors.soldPrice ?? ""}
-              </p>
-            </label>
-
-            <label className="space-y-1 text-sm text-slate-700 dark:text-slate-300 sm:col-span-2">
-              Sold platform
-              <EditableSelect
-                value={draft.soldPlatform}
-                options={platformOptions}
-                onChange={(value) => updateField("soldPlatform", value)}
-                selectClassName={selectClassName}
-                inputClassName={inputClassName}
-              />
-              <p className="min-h-4 text-xs font-medium text-rose-600 dark:text-rose-400">
-                {errors.soldPlatform ?? ""}
-              </p>
-            </label>
-          </div>
-        ) : null}
       </form>
     </Modal>
   );
