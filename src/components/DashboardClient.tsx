@@ -11,6 +11,7 @@ import {
   BanknoteArrowUp,
   ChartLine,
   ChevronDown,
+  EyeOff,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -55,6 +56,12 @@ export default function DashboardClient() {
   const [purchaseSectionOpen, setPurchaseSectionOpen] = useState(false);
   const [soldSectionOpen, setSoldSectionOpen] = useState(false);
 
+  const [hidePurchaseSection, setHidePurchaseSection] = useState(false);
+  const [hideSoldSection, setHideSoldSection] = useState(false);
+  const [hideStats, setHideStats] = useState(false);
+  const [hideInventoryChat, setHideInventoryChat] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
   const [matchExistingOpen, setMatchExistingOpen] = useState(false);
   const [parsedSoldData, setParsedSoldData] = useState<ReceiptRow | null>(null);
   const [selectedExistingId, setSelectedExistingId] = useState<string>("");
@@ -84,6 +91,39 @@ export default function DashboardClient() {
   useEffect(() => {
     setDetailsImageLoaded(false);
   }, [detailsRow?.id]);
+
+  useEffect(() => {
+    const savedHidePurchase = localStorage.getItem("hidePurchaseSection");
+    const savedHideSold = localStorage.getItem("hideSoldSection");
+    const savedHideStats = localStorage.getItem("hideStats");
+    const savedHideChat = localStorage.getItem("hideInventoryChat");
+
+    if (savedHidePurchase) setHidePurchaseSection(savedHidePurchase === "true");
+    if (savedHideSold) setHideSoldSection(savedHideSold === "true");
+    if (savedHideStats) setHideStats(savedHideStats === "true");
+    if (savedHideChat) setHideInventoryChat(savedHideChat === "true");
+    setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    localStorage.setItem("hidePurchaseSection", hidePurchaseSection.toString());
+  }, [hidePurchaseSection, preferencesLoaded]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    localStorage.setItem("hideSoldSection", hideSoldSection.toString());
+  }, [hideSoldSection, preferencesLoaded]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    localStorage.setItem("hideStats", hideStats.toString());
+  }, [hideStats, preferencesLoaded]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    localStorage.setItem("hideInventoryChat", hideInventoryChat.toString());
+  }, [hideInventoryChat, preferencesLoaded]);
 
   const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
@@ -413,99 +453,134 @@ export default function DashboardClient() {
           isLoggingOut={isLoggingOut}
         />
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Sold items
-              </p>
-              <BadgeCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
-              {isRowsLoading ? "-" : rows.filter((row) => row.sold).length}
-            </p>
-          </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Current inventory
-              </p>
-              <Archive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
-              {isRowsLoading ? "-" : rows.filter((row) => !row.sold).length}
-            </p>
-          </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Total spent
-              </p>
-              <BanknoteArrowDown className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
-              {isRowsLoading ? "-" : formatSek(totalSpent)}
-            </p>
-          </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Total earned
-              </p>
-              <BanknoteArrowUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
-              {isRowsLoading ? "-" : formatSek(totalEarned)}
-            </p>
-          </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Profit
-              </p>
-              <ChartLine
-                className={`h-5 w-5 ${profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
-              />
-            </div>
-            <p
-              className={`mt-2 text-3xl font-semibold ${
-                profit >= 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-rose-600 dark:text-rose-400"
-              }`}
+        {!hideStats && (
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setHideStats(true)}
+              className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             >
-              {isRowsLoading ? "-" : formatSek(profit)}
-            </p>
+              <EyeOff className="h-4 w-4" />
+              Hide stats
+            </button>
           </div>
-        </div>
+        )}
+
+        {!hideStats && (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Sold items
+                </p>
+                <BadgeCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
+                {isRowsLoading ? "-" : rows.filter((row) => row.sold).length}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Current inventory
+                </p>
+                <Archive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
+                {isRowsLoading ? "-" : rows.filter((row) => !row.sold).length}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Total spent
+                </p>
+                <BanknoteArrowDown className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
+                {isRowsLoading ? "-" : formatSek(totalSpent)}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Total earned
+                </p>
+                <BanknoteArrowUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">
+                {isRowsLoading ? "-" : formatSek(totalEarned)}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Profit
+                </p>
+                <ChartLine
+                  className={`h-5 w-5 ${profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
+                />
+              </div>
+              <p
+                className={`mt-2 text-3xl font-semibold ${
+                  profit >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                {isRowsLoading ? "-" : formatSek(profit)}
+              </p>
+            </div>
+          </div>
+        )}
 
         <section className="mt-10 space-y-8">
-          <InventoryChat rows={rows} />
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <button
-                type="button"
-                onClick={() => setPurchaseSectionOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-3xl px-6 py-6 text-left"
-              >
-                <div>
-                  <h2 className="text-2xl font-semibold dark:text-slate-50">
-                    Paste purchase receipt
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    Paste your receipt text and let Google AI extract structured
-                    item details.
-                  </p>
-                </div>
-                <ChevronDown
-                  className={`h-5 w-5 flex-shrink-0 cursor-pointer text-slate-400 transition-transform ${
-                    purchaseSectionOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+          {!hideInventoryChat && (
+            <InventoryChat
+              rows={rows}
+              onHide={() => setHideInventoryChat(true)}
+            />
+          )}
 
-              {purchaseSectionOpen ? (
-                <div className="flex flex-col px-6 pb-6">
+          <div className={`grid gap-6 ${!hidePurchaseSection && !hideSoldSection ? "lg:grid-cols-2 lg:items-start" : ""}`}>
+            <div>
+              {!hidePurchaseSection && (
+                <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between gap-2 px-6 py-6">
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseSectionOpen((v) => !v)}
+                      aria-expanded={purchaseSectionOpen}
+                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                    >
+                      <div>
+                        <h2 className="text-2xl font-semibold dark:text-slate-50">
+                          Paste purchase receipt
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                          Paste your receipt text and let Google AI extract structured
+                          item details.
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={`ml-2 h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                          purchaseSectionOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHidePurchaseSection(true)}
+                      className="cursor-pointer rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                      aria-label="Hide purchase receipt section"
+                      title="Hide section"
+                    >
+                      <EyeOff className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {purchaseSectionOpen ? (
+                    <div className="flex flex-col px-6 pb-6">
                   <textarea
                     value={receiptText}
                     onChange={(event) => {
@@ -553,33 +628,49 @@ export default function DashboardClient() {
                       </p>
                     ) : null}
                   </div>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+              )}
             </div>
 
-            <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <button
-                type="button"
-                onClick={() => setSoldSectionOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-3xl px-6 py-6 text-left"
-              >
-                <div>
-                  <h2 className="text-2xl font-semibold dark:text-slate-50">
-                    Paste sold receipt
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    Paste your sold item receipt and let Google AI extract the
-                    sale details.
-                  </p>
-                </div>
-                <ChevronDown
-                  className={`h-5 w-5 flex-shrink-0 cursor-pointer text-slate-400 transition-transform ${
-                    soldSectionOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+            <div>
+              {!hideSoldSection && (
+                <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between gap-2 px-6 py-6">
+                    <button
+                      type="button"
+                      onClick={() => setSoldSectionOpen((v) => !v)}
+                      aria-expanded={soldSectionOpen}
+                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                    >
+                      <div>
+                        <h2 className="text-2xl font-semibold dark:text-slate-50">
+                          Paste sold receipt
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                          Paste your sold item receipt and let Google AI extract the
+                          sale details.
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={`ml-2 h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                          soldSectionOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setHideSoldSection(true)}
+                        className="cursor-pointer rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        aria-label="Hide sold receipt section"
+                        title="Hide section"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                      </button>
+                  </div>
 
-              {soldSectionOpen ? (
+                  {soldSectionOpen ? (
                 <div className="flex flex-col px-6 pb-6">
                   <textarea
                     value={soldReceiptText}
@@ -630,6 +721,9 @@ export default function DashboardClient() {
                   </div>
                 </div>
               ) : null}
+            </div>
+              )}
+
             </div>
           </div>
 

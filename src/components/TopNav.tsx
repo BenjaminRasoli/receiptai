@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Props = {
   appName: string;
@@ -15,7 +15,24 @@ type Props = {
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/summary", label: "Summary" },
+  { href: "/profile", label: "Profile" },
 ];
+
+const getThemeSnapshot = () => {
+  const stored = localStorage.getItem("theme");
+  return stored
+    ? stored === "dark"
+    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
+
+const subscribeToTheme = (onChange: () => void) => {
+  window.addEventListener("storage", onChange);
+  window.addEventListener("receiptai-theme-change", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("receiptai-theme-change", onChange);
+  };
+};
 
 export default function TopNav({
   appName,
@@ -24,41 +41,40 @@ export default function TopNav({
   isLoggingOut = false,
 }: Props) {
   const pathname = usePathname();
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, () => false);
 
   const applyTheme = (dark: boolean) => {
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
   };
 
-  useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const dark = stored ? stored === "dark" : prefersDark;
-    setIsDark(dark);
-    applyTheme(dark);
-  }, []);
+  useEffect(() => applyTheme(isDark), [isDark]);
 
   const toggleTheme = () => {
     const next = !isDark;
-    setIsDark(next);
-    applyTheme(next);
     localStorage.setItem("theme", next ? "dark" : "light");
+    window.dispatchEvent(new Event("receiptai-theme-change"));
   };
 
   return (
     <nav className="mt-6 flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/95 px-4 py-4 shadow-md shadow-slate-200/40 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-none">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-slate-950 dark:text-slate-50">
+        <Link
+          href="/"
+          className="text-2xl font-semibold text-slate-950 dark:text-slate-50"
+        >
           {appName}
-        </h1>
+        </Link>
 
         <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
-          <span className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-slate-400 sm:flex-none">
-            {email}
-          </span>
+          {email ? (
+            <Link
+              href="/profile"
+              className="min-w-0 flex-1 truncate text-sm text-slate-600 hover:underline dark:text-slate-400 sm:flex-none"
+            >
+              {email}
+            </Link>
+          ) : null}
 
           <button
             type="button"

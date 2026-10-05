@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Send } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronDown, EyeOff, Send } from "lucide-react";
 import type { ReceiptRow } from "@/types/receipt";
 import ReactMarkdown from "react-markdown";
 
@@ -12,9 +12,10 @@ type Message = {
 
 type Props = {
   rows: ReceiptRow[];
+  onHide: () => void;
 };
 
-export default function InventoryChat({ rows }: Props) {
+export default function InventoryChat({ rows, onHide }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -52,25 +53,37 @@ export default function InventoryChat({ rows }: Props) {
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm flex flex-col dark:border-slate-800 dark:bg-slate-900">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-6 py-6 text-left"
-      >
-        <div>
-          <h2 className="text-2xl font-semibold dark:text-slate-50">
-            Ask about your inventory
-          </h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Ask questions about your items, profits, and trends.
-          </p>
-        </div>
-        <ChevronDown
-          className={`h-5 w-5 flex-shrink-0 cursor-pointer text-slate-400 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+      <div className="flex items-center justify-between gap-2 px-6 py-6">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-2xl font-semibold dark:text-slate-50">
+              Ask about your inventory
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Ask questions about your items, profits, and trends.
+            </p>
+          </div>
+          <ChevronDown
+            className={`ml-2 h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onHide}
+          aria-label="Hide inventory chat"
+          title="Hide inventory chat"
+          className="cursor-pointer rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          <EyeOff className="h-4 w-4" />
+        </button>
+      </div>
 
       {open ? (
         <>
