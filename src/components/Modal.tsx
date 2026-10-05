@@ -10,6 +10,7 @@ type Props = {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  extraHeaderAction?: ReactNode;
 };
 
 export default function Modal({
@@ -18,6 +19,7 @@ export default function Modal({
   onClose,
   children,
   footer,
+  extraHeaderAction,
 }: Props) {
   const { modalRef, onBackdropMouseDown } = useModalBehavior({
     isOpen,
@@ -39,14 +41,17 @@ export default function Modal({
           <h2 className="text-xl font-semibold text-slate-950 dark:text-slate-50">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            aria-label="Close modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {extraHeaderAction}
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
           {children}

@@ -35,6 +35,8 @@ type Props = {
   hideDateFilter?: boolean;
   hideHeader?: boolean;
   hidePurchaseDateColumn?: boolean;
+  hideInlineAddButton?: boolean;
+  hideHeaderAddButton?: boolean;
 };
 
 const getTotal = (row: ReceiptRow) =>
@@ -50,6 +52,8 @@ export default function ReceiptTable({
   hideDateFilter = false,
   hideHeader = false,
   hidePurchaseDateColumn = false,
+  hideInlineAddButton = false,
+  hideHeaderAddButton = false,
 }: Props) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("purchaseDate");
@@ -200,18 +204,20 @@ export default function ReceiptTable({
               Add, edit, and remove items using the modal form.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="cursor-pointer inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:w-auto sm:px-6 sm:py-3 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-          >
-            Add item manually
-          </button>
+          {!hideHeaderAddButton && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 sm:w-auto sm:px-6 sm:py-3 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            >
+              Add item manually
+            </button>
+          )}
         </div>
       )}
 
-      <div className="mb-4 flex gap-3">
-        <div className="relative flex-1">
+      <div className={`mb-4 ${hideInlineAddButton ? "" : "flex justify-between"} gap-3`}>
+        <div className={`relative ${hideInlineAddButton ? "" : "w-[70%]"}`}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
@@ -221,13 +227,15 @@ export default function ReceiptTable({
             className="w-full rounded-2xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-400 dark:focus:bg-slate-800"
           />
         </div>
-        <button
-          type="button"
-          onClick={onCreate}
-          className="cursor-pointer inline-flex shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-        >
-          Add item manually
-        </button>
+        {!hideInlineAddButton && (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="cursor-pointer inline-flex shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Add item manually
+          </button>
+        )}
       </div>
 
       <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50 sm:p-3">
