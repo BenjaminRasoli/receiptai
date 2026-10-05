@@ -1,17 +1,23 @@
 "use client";
 
+import { FirebaseError } from "firebase/app";
 import { signOut } from "firebase/auth";
+import { doc, deleteDoc } from "firebase/firestore";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import Modal from "@/components/Modal";
+import ReceiptFormModal from "@/components/ReceiptFormModal";
+import ReceiptTable from "@/components/ReceiptTable";
 import TopNav from "@/components/TopNav";
-import { auth } from "@/firebaseConfig";
+import { auth, db } from "@/firebaseConfig";
 import { useReceipts } from "@/hooks/useReceipts";
 import type { ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
-import { STATUS_META } from "@/utils/receipt";
+import { STATUS_META, createEmptyRow } from "@/utils/receipt";
+import { getCloudinaryThumbnail } from "@/utils/receiptImage";
 
 type DateSummary = {
   date: string;
@@ -33,18 +39,123 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 export default function SummaryClient() {
-  const { router, user, authReady, rows, isRowsLoading, loadError } =
-    useReceipts();
+  const {
+    router,
+    user,
+    authReady,
+    rows,
+    setRows,
+    isRowsLoading,
+    loadError,
+    receiptsCollection,
+    saveRowToFirestore,
+  } = useReceipts();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+  const [isSavingItem, setIsSavingItem] = useState(false);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("edit");
+  const [editingRow, setEditingRow] = useState<ReceiptRow | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingRow, setDeletingRow] = useState<ReceiptRow | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsRow, setDetailsRow] = useState<ReceiptRow | null>(null);
+  const [detailsImageLoaded, setDetailsImageLoaded] = useState(false);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await signOut(auth);
     router.replace("/auth");
+  };
+
+  const handleSaveModal = async (row: ReceiptRow) => {
+    setIsSavingItem(true);
+    try {
+      await saveRowToFirestore(row);
+      setRows((current) =>
+        current.map((item) => (item.id === row.id ? row : item)),
+      );
+      setFormOpen(false);
+      setEditingRow(null);
+    } catch (error: unknown) {
+      const saveError = error as FirebaseError;
+      const message = saveError.message ?? "Unknown error";
+      const code = saveError.code ? ` (${saveError.code})` : "";
+      console.error(`Unable to save to Firebase${code}: ${message}`);
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!deletingRow) return;
+    setIsDeletingItem(true);
+    try {
+      await deleteDoc(doc(receiptsCollection, deletingRow.id));
+      setRows((current) => current.filter((row) => row.id !== deletingRow.id));
+      setDeleteOpen(false);
+      setDeletingRow(null);
+    } catch (error: unknown) {
+      const deleteError = error as FirebaseError;
+      const message = deleteError.message ?? "Unknown error";
+      const code = deleteError.code ? ` (${deleteError.code})` : "";
+      console.error(`Unable to delete from Firebase${code}: ${message}`);
+    } finally {
+      setIsDeletingItem(false);
+    }
+  };
+
+  const openEditModal = (row: ReceiptRow) => {
+    setFormMode("edit");
+    setEditingRow(row);
+    setFormOpen(true);
+  };
+
+  const requestDelete = (row: ReceiptRow) => {
+    setDeletingRow(row);
+    setDeleteOpen(true);
+  };
+
+  const showDetails = (row: ReceiptRow) => {
+    setDetailsRow(row);
+    setDetailsOpen(true);
+  };
+
+  useEffect(() => {
+    setDetailsImageLoaded(false);
+  }, [detailsRow?.id]);
+
+  const platformOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const platform = row.platform.trim();
+      const soldPlatform = row.soldPlatform.trim();
+      if (platform) values.add(platform);
+      if (soldPlatform) values.add(soldPlatform);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const paymentMethodOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const paymentMethod = row.paymentMethod.trim();
+      if (paymentMethod) values.add(paymentMethod);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const openCreateModal = () => {
+    setFormMode("create");
+    setEditingRow(createEmptyRow());
+    setFormOpen(true);
   };
 
   const handleSort = (key: SortKey) => {
@@ -269,74 +380,17 @@ export default function SummaryClient() {
                         {isExpanded ? (
                           <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30">
                             <td colSpan={7} className="px-3 py-3">
-                              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                                <table className="w-full min-w-full table-auto text-sm">
-                                  <thead className="text-left text-slate-500 dark:text-slate-400">
-                                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Item
-                                      </th>
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Status
-                                      </th>
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Platform
-                                      </th>
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Purchase price
-                                      </th>
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Sold price
-                                      </th>
-                                      <th className="whitespace-nowrap px-3 py-2">
-                                        Sold date
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {s.items.map((item) => {
-                                      const meta = STATUS_META[item.status];
-                                      const price =
-                                        Number(
-                                          item.totalPrice || item.purchasePrice,
-                                        ) || 0;
-                                      return (
-                                        <tr
-                                          key={item.id}
-                                          className="border-b border-slate-100 last:border-0 dark:border-slate-800 dark:text-slate-100"
-                                        >
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            {item.item || "-"}
-                                          </td>
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            <span
-                                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${meta.badgeClassName}`}
-                                            >
-                                              {meta.label}
-                                            </span>
-                                          </td>
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            {item.platform || "-"}
-                                          </td>
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            {price ? formatSek(price) : "-"}
-                                          </td>
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            {item.soldPrice
-                                              ? formatSek(
-                                                  Number(item.soldPrice) || 0,
-                                                )
-                                              : "-"}
-                                          </td>
-                                          <td className="whitespace-nowrap px-3 py-2">
-                                            {item.soldDate || "-"}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
+                              <ReceiptTable
+                                rows={s.items}
+                                platformOptions={platformOptions}
+                                onCreate={openCreateModal}
+                                onEdit={openEditModal}
+                                onDelete={requestDelete}
+                                onShowDetails={showDetails}
+                                hideDateFilter={true}
+                                hideHeader={true}
+                                hidePurchaseDateColumn={true}
+                              />
                             </td>
                           </tr>
                         ) : null}
@@ -349,6 +403,142 @@ export default function SummaryClient() {
           </div>
         </div>
       </div>
+
+      <ReceiptFormModal
+        key={`${formMode}-${editingRow?.id ?? "new"}-${formOpen ? "open" : "closed"}`}
+        isOpen={formOpen}
+        mode={formMode}
+        initialRow={editingRow}
+        isSaving={isSavingItem}
+        platformOptions={platformOptions}
+        paymentMethodOptions={paymentMethodOptions}
+        onClose={() => setFormOpen(false)}
+        onSave={handleSaveModal}
+      />
+
+      <ConfirmModal
+        isOpen={deleteOpen}
+        title="Delete item?"
+        message={`This will permanently remove "${deletingRow?.item || "this item"}".`}
+        confirmLabel="Delete item"
+        isLoading={isDeletingItem}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void handleDeleteConfirmed()}
+      />
+
+      <Modal
+        isOpen={detailsOpen}
+        title={detailsRow?.item || "Item details"}
+        onClose={() => setDetailsOpen(false)}
+      >
+        {detailsRow?.imageUrl ? (
+          <div className="relative mb-2 flex h-72 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 p-3 dark:bg-slate-800">
+            {!detailsImageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-slate-700 dark:border-slate-600 dark:border-t-slate-200" />
+              </div>
+            )}
+            <img
+              key={detailsRow.id}
+              src={getCloudinaryThumbnail(detailsRow.imageUrl, 900)}
+              alt={detailsRow.item}
+              fetchPriority="high"
+              decoding="async"
+              onLoad={() => setDetailsImageLoaded(true)}
+              className="h-full w-full object-contain"
+            />
+          </div>
+        ) : null}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Item
+              </label>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {detailsRow?.item || "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Status
+              </label>
+              {detailsRow && (
+                <span
+                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${STATUS_META[detailsRow.status].badgeClassName}`}
+                >
+                  {STATUS_META[detailsRow.status].label}
+                </span>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Purchase date
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.purchaseDate || "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Platform
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.platform || "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Purchase price
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.totalPrice || detailsRow?.purchasePrice
+                  ? formatSek(
+                      Number(detailsRow.totalPrice || detailsRow.purchasePrice) ||
+                        0,
+                    )
+                  : "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Sold date
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.soldDate || "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Sold price
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.soldPrice
+                  ? formatSek(Number(detailsRow.soldPrice) || 0)
+                  : "-"}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Sold platform
+              </label>
+              <p className="text-sm text-slate-900 dark:text-slate-100">
+                {detailsRow?.soldPlatform || "-"}
+              </p>
+            </div>
+          </div>
+          {detailsRow?.soldReceiptText ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Sold receipt text
+              </label>
+              <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                {detailsRow.soldReceiptText}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
 
       <ConfirmModal
         isOpen={signOutOpen}
