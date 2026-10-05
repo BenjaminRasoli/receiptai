@@ -1155,6 +1155,16 @@ export default function DashboardClient() {
                 </p>
               </div>
             </div>
+            {detailsRow?.notes ? (
+              <div className="mt-3">
+                <p className="text-slate-500 dark:text-slate-400">Notes</p>
+                <div className="max-h-32 max-w-md overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                    {detailsRow.notes}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {detailsRow?.sold ? (
