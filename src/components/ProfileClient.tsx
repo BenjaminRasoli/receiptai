@@ -57,7 +57,10 @@ export default function ProfileClient() {
 
   const revertAll = () => {
     setPreferences(
-      DEFAULT_PREFERENCES.map((preference) => ({ ...preference, value: false })),
+      DEFAULT_PREFERENCES.map((preference) => ({
+        ...preference,
+        value: false,
+      })),
     );
     DEFAULT_PREFERENCES.forEach((preference) =>
       localStorage.removeItem(preference.key),
@@ -81,10 +84,7 @@ export default function ProfileClient() {
 
     try {
       const snapshot = await getDocs(
-        query(
-          collection(db, "items"),
-          where("userId", "==", user.uid),
-        ),
+        query(collection(db, "items"), where("userId", "==", user.uid)),
       );
       const data = snapshot.docs.map((item) => ({
         ...item.data(),
@@ -166,7 +166,7 @@ export default function ProfileClient() {
               {preferences.map((preference) => (
                 <div
                   key={preference.key}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50"
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-800/50"
                 >
                   <div className="flex items-center gap-3">
                     {preference.value ? (
@@ -210,7 +210,8 @@ export default function ProfileClient() {
               Export Data
             </h2>
             <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-              Download all receipt items belonging to your account as a JSON file.
+              Download all receipt items belonging to your account as a JSON
+              file.
             </p>
 
             {exportError && (

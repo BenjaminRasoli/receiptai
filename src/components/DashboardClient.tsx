@@ -467,7 +467,7 @@ export default function DashboardClient() {
         )}
 
         {!hideStats && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -534,7 +534,7 @@ export default function DashboardClient() {
           </div>
         )}
 
-        <section className="mt-10 space-y-8">
+        <section className="mt-8 space-y-8">
           {!hideInventoryChat && (
             <InventoryChat
               rows={rows}
@@ -542,8 +542,8 @@ export default function DashboardClient() {
             />
           )}
 
-          <div className={`grid gap-6 ${!hidePurchaseSection && !hideSoldSection ? "lg:grid-cols-2 lg:items-start" : ""}`}>
-            <div>
+          {(!hidePurchaseSection || !hideSoldSection) && (
+            <div className={`grid gap-6 ${!hidePurchaseSection && !hideSoldSection ? "lg:grid-cols-2 lg:items-start" : ""}`}>
               {!hidePurchaseSection && (
                 <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between gap-2 px-6 py-6">
@@ -632,9 +632,7 @@ export default function DashboardClient() {
                   ) : null}
                 </div>
               )}
-            </div>
 
-            <div>
               {!hideSoldSection && (
                 <div className="flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between gap-2 px-6 py-6">
@@ -721,11 +719,10 @@ export default function DashboardClient() {
                   </div>
                 </div>
               ) : null}
-            </div>
+              </div>
               )}
-
             </div>
-          </div>
+          )}
 
           {isRowsLoading ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
