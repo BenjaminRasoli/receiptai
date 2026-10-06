@@ -398,6 +398,16 @@ export default function ReceiptFormModal({
           </label>
 
           <label className={fieldWrapperClassName}>
+            Notes
+            <input
+              value={draft.notes}
+              onChange={(event) => updateField("notes", event.target.value)}
+              className={inputClassName}
+              placeholder="Optional notes..."
+            />
+          </label>
+
+          <label className={fieldWrapperClassName}>
             Status
             <select
               value={draft.status}
@@ -412,16 +422,6 @@ export default function ReceiptFormModal({
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className={fieldWrapperClassName}>
-            Notes
-            <input
-              value={draft.notes}
-              onChange={(event) => updateField("notes", event.target.value)}
-              className={inputClassName}
-              placeholder="Optional notes..."
-            />
           </label>
 
           {draft.status === "sold" ? (

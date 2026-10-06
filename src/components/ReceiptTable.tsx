@@ -349,32 +349,38 @@ export default function ReceiptTable({
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800/50 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-1">
-        <span className="font-semibold text-slate-900 dark:text-slate-100">
+      <div
+        className={`mb-4 grid ${
+          hideHeader
+            ? "w-full grid-cols-[max-content_max-content]"
+            : "w-full grid-cols-2"
+        } gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-800/50 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-1`}
+      >
+        <div className="min-w-0 font-semibold text-slate-900 dark:text-slate-100">
           {filterSummary.itemsCount} item
           {filterSummary.itemsCount === 1 ? "" : "s"}
-        </span>
-        <span className="text-slate-500 dark:text-slate-400">
+        </div>
+        <div className="min-w-0 break-words text-slate-500 dark:text-slate-400">
           Spent:{" "}
           <span className="font-medium text-slate-900 dark:text-slate-100">
             {formatSek(filterSummary.spent)}
           </span>
-        </span>
-        <span
-          className={`font-semibold ${
+        </div>
+        <div
+          className={`min-w-0 break-words font-semibold ${
             filterSummary.profit >= 0
               ? "text-emerald-600 dark:text-emerald-400"
               : "text-rose-600 dark:text-rose-400"
           }`}
         >
           Profit: {formatSek(filterSummary.profit)}
-        </span>
-        <span className="text-slate-500 dark:text-slate-400">
+        </div>
+        <div className="min-w-0 break-words text-slate-500 dark:text-slate-400">
           Earned ({filterSummary.soldCount} sold):{" "}
           <span className="font-medium text-slate-900 dark:text-slate-100">
             {formatSek(filterSummary.earned)}
           </span>
-        </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
