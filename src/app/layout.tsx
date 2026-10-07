@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "ReceiptAI",
   description:
     "AI-powered receipt parser and reselling tracker with Firebase login",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.ico",
+  },
 };
 
 export const viewport = {
