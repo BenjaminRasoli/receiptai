@@ -112,16 +112,34 @@ export const createEmptyRow = (): ReceiptRow => ({
   imagePublicId: "",
 });
 
+const normalizeDateValue = (raw: unknown): string => {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+
+  const isoDate = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoDate) return isoDate[1];
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export const normalizeAIParsed = (item: unknown): ReceiptRow => {
   const result = item as Record<string, unknown>;
   const seller = String(result.seller ?? "").trim();
   const itemName =
     String(result.itemName ?? result.item ?? "").trim() || "Item";
-  const purchaseDate = String(
-    result.paymentDate ?? result.purchaseDate ?? result.date ?? "",
-  ).trim();
+  const purchaseDate = normalizeDateValue(
+    result.purchaseDate ?? result.paymentDate ?? result.date ?? "",
+  );
   const paymentMethod = String(result.paymentMethod ?? "").trim();
-  const platform = String(result.platform ?? result.source ?? "").trim();
+  const platform = String(
+    result.platform ?? result.source ?? result.marketplace ?? "",
+  ).trim();
 
   return {
     id: createId(),
@@ -141,9 +159,15 @@ export const normalizeAIParsed = (item: unknown): ReceiptRow => {
     transactionId: String(result.transactionId ?? "").trim(),
     status: "available",
     sold: false,
-    soldDate: "",
-    soldPrice: "",
-    soldPlatform: "",
+    soldDate: normalizeDateValue(
+      result.soldDate ?? result.saleDate ?? result.sellingDate ?? "",
+    ),
+    soldPrice: String(
+      result.soldPrice ?? result.salePrice ?? result.sellingPrice ?? "",
+    ).trim(),
+    soldPlatform: String(
+      result.soldPlatform ?? result.salePlatform ?? result.sellingPlatform ?? "",
+    ).trim(),
     soldReceiptText: "",
     notes: "",
     imageUrl: "",

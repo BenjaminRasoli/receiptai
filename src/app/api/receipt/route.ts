@@ -5,7 +5,7 @@ const MODEL_URL =
 
 const promptForReceipt = (
   text: string,
-) => `Extract structured data from this receipt and return ONLY valid JSON with fields: seller, itemName, totalPrice, itemPrice, shipping, buyerProtectionFee, paymentMethod, paymentDate, transactionId. Use numbers for numeric fields and strings for text fields. Do not include any extra explanation or markdown.
+) => `Extract structured data from this receipt and return ONLY valid JSON with fields: seller, itemName, totalPrice, itemPrice, shipping, buyerProtectionFee, paymentMethod, paymentDate, purchaseDate, platform, transactionId, soldPrice, soldPlatform, soldDate. Use numbers for numeric fields and strings for text fields. platform is where the item was bought or sold (e.g. Vinted, Tradera, Blocket, eBay, Facebook Marketplace) — extract it if mentioned anywhere in the receipt. purchaseDate must be date only in YYYY-MM-DD format with no time. If this receipt is for a SALE of an item, also fill soldPrice, soldPlatform, and soldDate (YYYY-MM-DD, no time). Do not include any extra explanation or markdown.
 
 Receipt: ${text}`;
 
