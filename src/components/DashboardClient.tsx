@@ -25,6 +25,7 @@ import type { ReceiptRow } from "@/types/receipt";
 import { formatSek } from "@/utils/format";
 import { createEmptyRow, normalizeAIParsed } from "@/utils/receipt";
 import InventoryChat from "./InventoryChat";
+import DescribePurchaseSection from "./DescribePurchaseSection";
 import { getCloudinaryThumbnail } from "@/utils/receiptImage";
 
 export default function DashboardClient() {
@@ -60,6 +61,7 @@ export default function DashboardClient() {
   const [hideSoldSection, setHideSoldSection] = useState(false);
   const [hideStats, setHideStats] = useState(false);
   const [hideInventoryChat, setHideInventoryChat] = useState(false);
+  const [hideDescribeSection, setHideDescribeSection] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   const [matchExistingOpen, setMatchExistingOpen] = useState(false);
@@ -97,11 +99,14 @@ export default function DashboardClient() {
     const savedHideSold = localStorage.getItem("hideSoldSection");
     const savedHideStats = localStorage.getItem("hideStats");
     const savedHideChat = localStorage.getItem("hideInventoryChat");
+    const savedHideDescribe = localStorage.getItem("hideDescribeSection");
 
     if (savedHidePurchase) setHidePurchaseSection(savedHidePurchase === "true");
     if (savedHideSold) setHideSoldSection(savedHideSold === "true");
     if (savedHideStats) setHideStats(savedHideStats === "true");
     if (savedHideChat) setHideInventoryChat(savedHideChat === "true");
+    if (savedHideDescribe)
+      setHideDescribeSection(savedHideDescribe === "true");
     setPreferencesLoaded(true);
   }, []);
 
@@ -124,6 +129,11 @@ export default function DashboardClient() {
     if (!preferencesLoaded) return;
     localStorage.setItem("hideInventoryChat", hideInventoryChat.toString());
   }, [hideInventoryChat, preferencesLoaded]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    localStorage.setItem("hideDescribeSection", hideDescribeSection.toString());
+  }, [hideDescribeSection, preferencesLoaded]);
 
   const inventoryItems = useMemo(() => rows.filter((row) => !row.sold), [rows]);
 
@@ -169,6 +179,11 @@ export default function DashboardClient() {
     } finally {
       setIsSavingItem(false);
     }
+  };
+
+  const handleDescribeAdd = async (row: ReceiptRow) => {
+    await saveRowToFirestore(row);
+    setRows((current) => [row, ...current]);
   };
 
   const handleDeleteConfirmed = async () => {
@@ -539,6 +554,14 @@ export default function DashboardClient() {
             <InventoryChat
               rows={rows}
               onHide={() => setHideInventoryChat(true)}
+            />
+          )}
+
+          {!hideDescribeSection && (
+            <DescribePurchaseSection
+              platformOptions={platformOptions}
+              onAdd={handleDescribeAdd}
+              onHide={() => setHideDescribeSection(true)}
             />
           )}
 

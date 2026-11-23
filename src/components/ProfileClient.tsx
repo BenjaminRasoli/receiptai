@@ -15,6 +15,7 @@ const DEFAULT_PREFERENCES = [
   { key: "hideSoldSection", label: "Hide sold receipt section" },
   { key: "hideStats", label: "Hide stats cards" },
   { key: "hideInventoryChat", label: "Hide inventory chat" },
+  { key: "hideDescribeSection", label: "Hide describe purchase section" },
 ] as const;
 
 type PreferenceKey = (typeof DEFAULT_PREFERENCES)[number]["key"];
