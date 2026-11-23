@@ -574,7 +574,7 @@ export default function DashboardClient() {
                       type="button"
                       onClick={() => setPurchaseSectionOpen((v) => !v)}
                       aria-expanded={purchaseSectionOpen}
-                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center justify-between text-left"
                     >
                       <div>
                         <h2 className="text-2xl font-semibold dark:text-slate-50">
@@ -663,7 +663,7 @@ export default function DashboardClient() {
                       type="button"
                       onClick={() => setSoldSectionOpen((v) => !v)}
                       aria-expanded={soldSectionOpen}
-                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center justify-between text-left"
                     >
                       <div>
                         <h2 className="text-2xl font-semibold dark:text-slate-50">

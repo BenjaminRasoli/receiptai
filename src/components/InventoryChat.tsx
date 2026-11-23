@@ -58,7 +58,7 @@ export default function InventoryChat({ rows, onHide }: Props) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center justify-between text-left"
+          className="flex min-w-0 flex-1 cursor-pointer items-center justify-between text-left"
         >
           <div>
             <h2 className="text-2xl font-semibold dark:text-slate-50">

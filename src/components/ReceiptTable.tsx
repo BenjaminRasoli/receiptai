@@ -16,6 +16,7 @@ import { formatSek } from "@/utils/format";
 import { STATUS_META, STATUS_OPTIONS, statusRank } from "@/utils/receipt";
 
 type SortKey =
+  | "image"
   | "item"
   | "purchaseDate"
   | "platform"
@@ -162,6 +163,9 @@ export default function ReceiptTable({
       let cmp = 0;
 
       switch (sortKey) {
+        case "image":
+          cmp = (a.imageUrl ? 1 : 0) - (b.imageUrl ? 1 : 0);
+          break;
         case "status":
           cmp = statusRank(a.status) - statusRank(b.status);
           break;
@@ -387,7 +391,12 @@ export default function ReceiptTable({
         <table className="w-full min-w-full table-auto text-sm text-slate-900 dark:text-slate-100">
           <thead className="text-left text-slate-700 dark:text-slate-300">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="whitespace-nowrap px-3 py-3">Icon</th>
+              <th
+                className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
+                onClick={() => handleSort("image")}
+              >
+                Icon <SortIcon col="image" />
+              </th>
               <th
                 className="whitespace-nowrap px-3 py-3 cursor-pointer select-none hover:text-slate-950 focus:outline-none active:bg-transparent dark:hover:text-slate-50"
                 onClick={() => handleSort("item")}
