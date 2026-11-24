@@ -363,7 +363,15 @@ export default function DescribePurchaseSection({
         parsed.message ||
         (parsed.complete
           ? "Got it, item added."
-          : `I'm still missing: ${parsed.missingFields.join(", ")}.`);
+          : `I'm still missing: ${parsed.missingFields
+              .map((f) =>
+                f === "item"
+                  ? "item name"
+                  : f === "price"
+                    ? "price"
+                    : "purchase date",
+              )
+              .join(", ")}.`);
 
       if (parsed.complete) {
         try {
@@ -405,7 +413,7 @@ export default function DescribePurchaseSection({
             </h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Say or type what you bought, for how much, when, and where —
-              Google AI fills in the rest.
+              the AI fills in the rest.
             </p>
           </div>
           <ChevronDown

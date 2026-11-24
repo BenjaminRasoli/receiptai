@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const MODEL_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+import { AIError, generateText } from "@/utils/ai";
 
 const buildPrompt = (message: string, rows: unknown[]) => `
 You are a helpful assistant for a reselling tracker app called ReceiptAI.
@@ -25,36 +23,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing message." }, { status: 400 });
   }
 
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey) {
+  try {
+    const reply = await generateText(buildPrompt(message, rows));
+    return NextResponse.json({
+      reply: reply.trim() || "No response.",
+    });
+  } catch (error) {
+    if (error instanceof AIError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
-      { error: "Google Gemini API key not configured." },
+      { error: "AI request failed." },
       { status: 500 },
     );
   }
-
-  const response = await fetch(MODEL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(message, rows) }] }],
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: data.error?.message ?? "Google AI request failed." },
-      { status: response.status },
-    );
-  }
-
-  const text =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No response.";
-
-  return NextResponse.json({ reply: text });
 }

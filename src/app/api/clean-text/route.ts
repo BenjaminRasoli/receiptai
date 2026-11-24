@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const MODEL_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+import { AIError, generateText, GROQ_MODELS } from "@/utils/ai";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -9,14 +7,6 @@ export async function POST(request: NextRequest) {
 
   if (!text) {
     return NextResponse.json({ error: "Missing text." }, { status: 400 });
-  }
-
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Google Gemini API key not configured." },
-      { status: 500 },
-    );
   }
 
   const prompt = `Fix obvious speech-to-text errors in the text below. It is a mixed Swedish/English spoken sentence about a purchase (item, price, platform, date).
@@ -29,35 +19,28 @@ Rules:
 
 Text: ${text}`;
 
-  const response = await fetch(MODEL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 300 },
-    }),
-  });
+  try {
+    const cleanText = (
+      await generateText(prompt, {
+        model: GROQ_MODELS.fast,
+        maxTokens: 300,
+      })
+    )
+      .trim()
+      .replace(/^["'\u201C\u201D]+|["'\u201C\u201D]+$/g, "")
+      .trim();
 
-  const data = await response.json();
-
-  if (!response.ok) {
+    return NextResponse.json({ cleanText: cleanText || text });
+  } catch (error) {
+    if (error instanceof AIError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
-      { error: data.error?.message ?? "Google AI request failed." },
-      { status: response.status },
+      { error: "AI request failed." },
+      { status: 500 },
     );
   }
-
-  const cleanText = (
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-    data?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text ??
-    text
-  )
-    .trim()
-    .replace(/^["'\u201C\u201D]+|["'\u201C\u201D]+$/g, "")
-    .trim();
-
-  return NextResponse.json({ cleanText: cleanText || text });
 }

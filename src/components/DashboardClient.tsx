@@ -225,7 +225,7 @@ export default function DashboardClient() {
       const result = await response.json();
 
       if (!response.ok) {
-        setPurchaseStatusMessage(result.error ?? "Google AI parse failed.");
+        setPurchaseStatusMessage(result.error ?? "AI parse failed.");
         return;
       }
 
@@ -238,7 +238,7 @@ export default function DashboardClient() {
 
       if (!parsed.length) {
         setPurchaseStatusMessage(
-          "Google AI returned no structured items. Try a clearer receipt.",
+          "AI returned no structured items. Try a clearer receipt.",
         );
         return;
       }
@@ -247,12 +247,12 @@ export default function DashboardClient() {
         await Promise.all(parsed.map((row) => saveRowToFirestore(row)));
       }
       setRows((current) => [...parsed, ...current]);
-      setAiSuccessMessage("Google AI parsed receipt into table rows.");
+      setAiSuccessMessage("AI parsed receipt into table rows.");
       setReceiptText("");
       setParseTouched(false);
     } catch {
       setPurchaseStatusMessage(
-        "Google AI request failed. Check your API key and server logs.",
+        "AI request failed. Check your API key and server logs.",
       );
     } finally {
       setAiLoading(false);
@@ -278,7 +278,7 @@ export default function DashboardClient() {
       const result = await response.json();
 
       if (!response.ok) {
-        setSoldStatusMessage(result.error ?? "Google AI parse failed.");
+        setSoldStatusMessage(result.error ?? "AI parse failed.");
         return;
       }
 
@@ -291,7 +291,7 @@ export default function DashboardClient() {
 
       if (!firstParsed) {
         setSoldStatusMessage(
-          "Google AI returned no structured items. Try a clearer receipt.",
+          "AI returned no structured items. Try a clearer receipt.",
         );
         return;
       }
@@ -314,7 +314,7 @@ export default function DashboardClient() {
       setSoldParseTouched(false);
     } catch {
       setSoldStatusMessage(
-        "Google AI request failed. Check your API key and server logs.",
+        "AI request failed. Check your API key and server logs.",
       );
     } finally {
       setSoldAiLoading(false);
@@ -581,7 +581,7 @@ export default function DashboardClient() {
                           Paste purchase receipt
                         </h2>
                         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                          Paste your receipt text and let Google AI extract structured
+                          Paste your receipt text and let the AI extract structured
                           item details.
                         </p>
                       </div>
@@ -636,7 +636,7 @@ export default function DashboardClient() {
                       {aiLoading ? (
                         <LoadingSpinner label="Parsing with AI..." size={18} />
                       ) : (
-                        "Parse with Google AI"
+                        "Parse with AI"
                       )}
                     </button>
                   </div>
@@ -670,7 +670,7 @@ export default function DashboardClient() {
                           Paste sold receipt
                         </h2>
                         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                          Paste your sold item receipt and let Google AI extract the
+                          Paste your sold item receipt and let the AI extract the
                           sale details.
                         </p>
                       </div>
@@ -725,7 +725,7 @@ export default function DashboardClient() {
                       {soldAiLoading ? (
                         <LoadingSpinner label="Parsing with AI..." size={18} />
                       ) : (
-                        "Parse with Google AI"
+                        "Parse with AI"
                       )}
                     </button>
                   </div>

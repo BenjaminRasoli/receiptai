@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const MODEL_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+import { AIError, generateText } from "@/utils/ai";
 
 const promptForReceipt = (
   text: string,
@@ -31,58 +29,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Google Gemini API key not configured." },
-      { status: 500 },
-    );
-  }
+  try {
+    const outputText = await generateText(promptForReceipt(text), {
+      json: true,
+      maxTokens: 2048,
+    });
 
-  const response = await fetch(MODEL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [
+    const parsed = parseJson(outputText);
+    if (!parsed) {
+      return NextResponse.json(
         {
-          parts: [{ text: promptForReceipt(text) }],
+          error: "Could not parse JSON from AI output.",
+          raw: outputText,
         },
-      ],
-    }),
-  });
+        { status: 500 },
+      );
+    }
 
-  const data = await response.json();
-
-  if (!response.ok) {
+    return NextResponse.json({ raw: outputText, parsed });
+  } catch (error) {
+    if (error instanceof AIError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
-      {
-        error: data.error?.message ?? "Google AI request failed.",
-        details: data,
-      },
-      { status: response.status },
-    );
-  }
-
-  const outputText =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-    data?.candidates?.[0]?.content?.[0]?.parts?.[0]?.text ??
-    data?.candidates?.[0]?.content?.[0]?.text ??
-    data?.output?.[0]?.content?.[0]?.text ??
-    "";
-
-  const parsed = parseJson(outputText);
-  if (!parsed) {
-    return NextResponse.json(
-      {
-        error: "Could not parse JSON from AI output.",
-        raw: outputText,
-      },
+      { error: "AI request failed." },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({ raw: outputText, parsed });
 }
